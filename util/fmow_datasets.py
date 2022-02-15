@@ -138,7 +138,7 @@ class CustomDatasetFromImagesTemporal(Dataset):
 def build_fmow_dataset(is_train, args):
     transform = build_transform(is_train, args)
 
-    root = os.path.join(args.data_path)
+    root = os.path.join(args.train_path if is_train else args.test_path)
     dataset = CustomDatasetFromImages(root, transform)
     print(dataset)
 
