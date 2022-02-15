@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import numpy as np
 import warnings
@@ -5,6 +6,7 @@ import random
 from glob import glob
 
 from torch.utils.data.dataset import Dataset
+from torchvision import datasets, transforms
 from PIL import Image
 
 Image.MAX_IMAGE_PIXELS = None
@@ -131,3 +133,38 @@ class CustomDatasetFromImagesTemporal(Dataset):
 
     def __len__(self):
         return self.data_len
+
+
+def build_fmow_dataset(is_train, args):
+    transform = build_transform(is_train, args)
+
+    root = os.path.join(args.data_path)
+    dataset = CustomDatasetFromImages(root, transform)
+    print(dataset)
+
+    return dataset
+
+
+def build_transform(is_train, args):
+    # mean = IMAGENET_DEFAULT_MEAN
+    # std = IMAGENET_DEFAULT_STD
+    # train transform
+    if is_train:
+        print("not yet implemented")
+        pass
+
+    # eval transform
+    t = []
+    if args.input_size <= 224:
+        crop_pct = 224 / 256
+    else:
+        crop_pct = 1.0
+    size = int(args.input_size / crop_pct)
+    t.append(
+        transforms.Resize(size, interpolation=Image.BICUBIC),  # to maintain same ratio w.r.t. 224 images
+    )
+    t.append(transforms.CenterCrop(args.input_size))
+
+    t.append(transforms.ToTensor())
+    # t.append(transforms.Normalize(mean, std))
+    return transforms.Compose(t)
