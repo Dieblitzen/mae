@@ -73,8 +73,10 @@ def get_args_parser():
                         help='epochs to warmup LR')
 
     # Dataset parameters
-    parser.add_argument('--data_path', default='/datasets01/imagenet_full_size/061417/', type=str,
-                        help='dataset path')
+    parser.add_argument('--train_path', default='/atlas/u/buzkent/patchdrop/data/fMoW/train_62classes.csv', type=str,
+                        help='Train .csv path')
+    parser.add_argument('--test_path', default='/atlas/u/buzkent/patchdrop/data/fMoW/test_62classes.csv', type=str,
+                        help='Test .csv path')
 
     parser.add_argument('--output_dir', default='./output_dir',
                         help='path where to save, empty for no saving')
