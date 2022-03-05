@@ -149,12 +149,16 @@ def build_transform(is_train, args):
     # mean = IMAGENET_DEFAULT_MEAN
     # std = IMAGENET_DEFAULT_STD
     # train transform
+    t = []
     if is_train:
-        print("not yet implemented")
-        pass
+        t.append(
+            transforms.RandomResizedCrop(args.input_size, scale=(0.2, 1.0), interpolation=3),  # 3 is bicubic
+        )
+        t.append(transforms.RandomHorizontalFlip())
+        t.append(transforms.ToTensor())
+        return transforms.Compose(t)
 
     # eval transform
-    t = []
     if args.input_size <= 224:
         crop_pct = 224 / 256
     else:
