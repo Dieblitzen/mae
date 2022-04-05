@@ -255,19 +255,19 @@ class SentinelIndividualImageDataset(Dataset):
         return img_as_tensor, labels
 
 
-def build_fmow_dataset(is_train, args, dataset_type='rgb'):
+def build_fmow_dataset(is_train, args):
     transform = build_transform(is_train, args)
 
     csv_path = os.path.join(args.train_path if is_train else args.test_path)
 
-    if dataset_type == 'rgb':
+    if args.dataset_type == 'rgb':
         dataset = CustomDatasetFromImages(csv_path, transform)
-    elif dataset_type == 'sentinel':
+    elif args.dataset_type == 'sentinel':
         dataset = SentinelIndividualImageDataset(csv_path, transform)
-    elif dataset_type == 'combined':
+    elif args.dataset_type == 'combined':
         raise NotImplementedError("combined not yet implemented")
     else:
-        raise ValueError(f"Invalid dataset type: {dataset_type}")
+        raise ValueError(f"Invalid dataset type: {args.dataset_type}")
     print(dataset)
 
     return dataset

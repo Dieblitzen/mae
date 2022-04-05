@@ -77,6 +77,8 @@ def get_args_parser():
                         help='Train .csv path')
     parser.add_argument('--test_path', default='/atlas/u/buzkent/patchdrop/data/fMoW/test_62classes.csv', type=str,
                         help='Test .csv path')
+    parser.add_argument('--dataset_type', default='rgb',
+                        help='Whether to use fmow rgb, sentinel, or other dataset.')
 
     parser.add_argument('--output_dir', default='./output_dir',
                         help='path where to save, empty for no saving')
