@@ -184,7 +184,8 @@ class SentinelIndividualImageDataset(Dataset):
             .sort_values(['category', 'location_id', 'timestamp'])
 
         # Filter by category
-        if CATEGORIES is not None:
+        self.categories = CATEGORIES
+        if categories is not None:
             self.categories = categories
             self.df = self.df.loc[categories]
 
