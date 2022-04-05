@@ -154,7 +154,8 @@ def main(args):
     )
     
     # define the model
-    model = models_mae.__dict__[args.model](norm_pix_loss=args.norm_pix_loss)
+    in_c = 13 if args.dataset_type == 'sentinel' else 3
+    model = models_mae.__dict__[args.model](in_chans=in_c, norm_pix_loss=args.norm_pix_loss)
 
     model.to(device)
 
