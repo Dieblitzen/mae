@@ -215,9 +215,9 @@ class SentinelIndividualImageDataset(Dataset):
             #     out_shape=(data.count, self.resize, self.resize),
             #     resampling=Resampling.bilinear
             # )
-            img = data.read()
+            img = data.read()  # (c, h, w)
 
-        return img
+        return img.permute(1, 2, 0)  # (h, w, c)
 
     def __getitem__(self, idx):
         ''' Gets timeseries info for images in one area
