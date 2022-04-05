@@ -217,7 +217,7 @@ class SentinelIndividualImageDataset(Dataset):
             # )
             img = data.read()  # (c, h, w)
 
-        return img.transpose(1, 2, 0)  # (h, w, c)
+        return img.transpose(1, 2, 0).astype(np.float32)  # (h, w, c)
 
     def __getitem__(self, idx):
         ''' Gets timeseries info for images in one area
