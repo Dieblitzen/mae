@@ -113,6 +113,9 @@ def get_args_parser():
                         help='Train .csv path')
     parser.add_argument('--test_path', default='/atlas/u/buzkent/patchdrop/data/fMoW/test_62classes.csv', type=str,
                         help='Test .csv path')
+    parser.add_argument('--dataset_type', default='rgb',
+                        help='Whether to use fmow rgb, sentinel, or other dataset.')
+
     parser.add_argument('--nb_classes', default=62, type=int,
                         help='number of the classification types')
 
@@ -219,7 +222,9 @@ def main(args):
             prob=args.mixup_prob, switch_prob=args.mixup_switch_prob, mode=args.mixup_mode,
             label_smoothing=args.smoothing, num_classes=args.nb_classes)
 
+    in_c = 13 if args.dataset_type == 'sentinel' else 3
     model = models_vit.__dict__[args.model](
+        in_chans=in_c,
         num_classes=args.nb_classes,
         drop_path_rate=args.drop_path,
         global_pool=args.global_pool,
@@ -231,7 +236,7 @@ def main(args):
         print("Load pre-trained checkpoint from: %s" % args.finetune)
         checkpoint_model = checkpoint['model']
         state_dict = model.state_dict()
-        for k in ['head.weight', 'head.bias']:
+        for k in ['patch_embed.proj.weight', 'patch_embed.proj.bias', 'head.weight', 'head.bias']:
             if k in checkpoint_model and checkpoint_model[k].shape != state_dict[k].shape:
                 print(f"Removing key {k} from pretrained checkpoint")
                 del checkpoint_model[k]
