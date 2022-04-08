@@ -77,6 +77,8 @@ def get_args_parser():
                         help='Train .csv path')
     parser.add_argument('--test_path', default='/atlas/u/buzkent/patchdrop/data/fMoW/test_62classes.csv', type=str,
                         help='Test .csv path')
+    parser.add_argument('--dataset_type', default='rgb',
+                        help='Whether to use fmow rgb, sentinel, or other dataset.')
 
     parser.add_argument('--output_dir', default='./output_dir',
                         help='path where to save, empty for no saving')
@@ -99,7 +101,7 @@ def get_args_parser():
     # distributed training parameters
     parser.add_argument('--world_size', default=1, type=int,
                         help='number of distributed processes')
-    parser.add_argument('--local_rank', default=-1, type=int)
+    parser.add_argument('--local_rank', default=os.getenv('LOCAL_RANK', 0), type=int)  # prev default was -1
     parser.add_argument('--dist_on_itp', action='store_true')
     parser.add_argument('--dist_url', default='env://',
                         help='url used to set up distributed training')
@@ -152,7 +154,8 @@ def main(args):
     )
     
     # define the model
-    model = models_mae.__dict__[args.model](norm_pix_loss=args.norm_pix_loss)
+    in_c = 13 if args.dataset_type == 'sentinel' else 3
+    model = models_mae.__dict__[args.model](in_chans=in_c, norm_pix_loss=args.norm_pix_loss)
 
     model.to(device)
 
@@ -193,7 +196,7 @@ def main(args):
             log_writer=log_writer,
             args=args
         )
-        if args.output_dir and (epoch % 10 == 0 or epoch + 1 == args.epochs):
+        if args.output_dir and (epoch % 5 == 0 or epoch + 1 == args.epochs):
             misc.save_model(
                 args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                 loss_scaler=loss_scaler, epoch=epoch)
