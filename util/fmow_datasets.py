@@ -9,6 +9,10 @@ from torch.utils.data.dataset import Dataset
 from torchvision import datasets, transforms
 from PIL import Image
 import rasterio
+from rasterio import logging
+
+log = logging.getLogger()
+log.setLevel(logging.ERROR)
 
 Image.MAX_IMAGE_PIXELS = None
 warnings.simplefilter('ignore', Image.DecompressionBombWarning)
