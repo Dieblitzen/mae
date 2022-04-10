@@ -60,7 +60,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
         if not math.isfinite(loss_value):
             print("Loss is {}, stopping training".format(loss_value))
-            sys.exit(1)
+            raise ValueError(f"Loss is {loss_value}, stopping training")
+            # sys.exit(1)
 
         loss /= accum_iter
         loss_scaler(loss, optimizer, clip_grad=max_norm,
