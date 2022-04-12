@@ -1,3 +1,4 @@
+import math
 import torch
 import torchvision
 import argparse
@@ -19,8 +20,8 @@ def get_mean_std(dataset):
         mean = torch.logsumexp(torch.stack((mean, img_sum), dim=0), dim=0)  # (c,)
         std = torch.logsumexp(torch.stack((std, img_sum_sq), dim=0), dim=0)  # (c,)
 
-    mean = torch.exp(mean)/count
-    std = torch.sqrt(std/count - (mean ** 2))
+    mean = torch.exp(mean - math.log(count))
+    std = torch.sqrt(torch.exp(std - math.log(count)) - (mean ** 2))
 
     return mean, std
 
