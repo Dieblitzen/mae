@@ -7,8 +7,8 @@ from fmow_datasets import CustomDatasetFromImages, SentinelIndividualImageDatase
 
 
 def get_mean_std(dataset):
-    mean = torch.zeros(dataset[0][0].shape[1]).log()  # (c,)
-    std = torch.zeros(dataset[0][0].shape[1]).log()  # (c,)
+    mean = torch.zeros(dataset[0][0].shape[0]).log()  # (c,)
+    std = torch.zeros(dataset[0][0].shape[0]).log()  # (c,)
     count = 0
     for i in tqdm(range(len(dataset))):
         x, _ = dataset[i]  # (c, h, w)
