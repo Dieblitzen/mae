@@ -3,7 +3,7 @@ import torchvision
 import argparse
 from tqdm import tqdm
 
-from util.fmow_datasets import CustomDatasetFromImages, SentinelIndividualImageDataset
+from fmow_datasets import CustomDatasetFromImages, SentinelIndividualImageDataset
 
 
 def get_mean_std(dataset):
