@@ -22,8 +22,7 @@ def get_mean_std(dataset):
     mean = torch.exp(mean)/count
     std = torch.sqrt(std/count - (mean ** 2))
 
-    print(f"Mean: {mean.tolist()}")
-    print(f"StdDev: {std.tolist()}")
+    return mean, std
 
 
 def passed_args():
@@ -45,4 +44,6 @@ if __name__ == "__main__":
 
     transform = torchvision.transforms.ToTensor()
     dataset = dataset_type(args.dataset, transform)
-
+    mean, std = get_mean_std(dataset)
+    print(f"Mean: {mean.tolist()}")
+    print(f"StdDev: {std.tolist()}")
