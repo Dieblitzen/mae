@@ -36,13 +36,13 @@ def get_sum_count(i, dataset):
     return img_sum, img_sum_sq, img_count
 
 
-def get_mean_std_parrallel(dataset):
+def get_mean_std_parrallel(dataset, num_workers):
     mean = torch.zeros(dataset[0][0].shape[0]).log()  # (c,)
     std = torch.zeros(dataset[0][0].shape[0]).log()  # (c,)
     count = 0
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=16) as ex:
-        future_to_i = {ex.submit(get_sum_count, i, dataset) for i in range(len(dataset))}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as ex:
+        future_to_i = {ex.submit(get_sum_count, i, dataset): i for i in range(len(dataset))}
         for future in concurrent.futures.as_completed(future_to_i):
             try:
                 img_sum, img_sum_sq, img_count = future.result()
@@ -65,6 +65,7 @@ def passed_args():
     parser.add_argument('--dataset_type', type=str, default='rgb',
                         help='Sentinel or rgb')
     parser.add_argument('--dataset', type=str, required=True)
+    parser.add_argument('--num_workers', type=int, default=16)
     return parser.parse_args()
 
 
@@ -79,6 +80,7 @@ if __name__ == "__main__":
 
     transform = torchvision.transforms.ToTensor()
     dataset = dataset_type(args.dataset, transform)
-    mean, std = get_mean_std(dataset)
+    # mean, std = get_mean_std(dataset)
+    mean, std = get_mean_std_parrallel(dataset, args.num_workers)
     print(f"Mean: {mean.tolist()}")
     print(f"StdDev: {std.tolist()}")
