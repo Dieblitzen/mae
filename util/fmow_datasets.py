@@ -17,7 +17,6 @@ log.setLevel(logging.ERROR)
 Image.MAX_IMAGE_PIXELS = None
 warnings.simplefilter('ignore', Image.DecompressionBombWarning)
 
-
 CATEGORIES = ["airport", "airport_hangar", "airport_terminal", "amusement_park",
               "aquaculture", "archaeological_site", "barn", "border_checkpoint",
               "burial_site", "car_dealership", "construction_site", "crop_field",
@@ -37,6 +36,9 @@ CATEGORIES = ["airport", "airport_hangar", "airport_terminal", "amusement_park",
 
 
 class CustomDatasetFromImages(Dataset):
+    mean = [0.4182007312774658, 0.4214799106121063, 0.3991275727748871]
+    std = [0.28774282336235046, 0.27541765570640564, 0.2764017581939697]
+
     def __init__(self, csv_path, transform):
         """
         Args:
@@ -71,7 +73,6 @@ class CustomDatasetFromImages(Dataset):
         return self.data_len
 
 
-
 class CustomDatasetFromImagesTemporalClassification(Dataset):
     def __init__(self, csv_path, transform):
         """
@@ -85,9 +86,9 @@ class CustomDatasetFromImagesTemporalClassification(Dataset):
         # Read the csv file
         self.data_info = pd.read_csv(csv_path, header=0)
         # First column contains the image paths
-        self.image_arr = np.asarray(self.data_info.iloc[:, 1])#[:16]
+        self.image_arr = np.asarray(self.data_info.iloc[:, 1])  # [:16]
         # Second column is the labels
-        self.label_arr = np.asarray(self.data_info.iloc[:, 0])#[:16]
+        self.label_arr = np.asarray(self.data_info.iloc[:, 0])  # [:16]
         # Calculate len
         self.data_len = len(self.data_info.index)
 
@@ -161,6 +162,12 @@ class CustomDatasetFromImagesTemporal(Dataset):
 class SentinelIndividualImageDataset(Dataset):
     '''fMoW Dataset'''
     label_types = ['value', 'one-hot']
+    mean = [1528.95196144, 1328.25499405, 1266.89069048, 1291.00755291,
+            1434.16026754, 1875.09183616, 2105.98183944, 2011.99096669,
+            2249.16037307, 646.2279407, 16.70945023, 1956.35727047, 1410.61220574]
+    std = [479.13790541, 557.86106904, 641.98097633, 920.0795879,
+           908.56999468, 1005.07731805, 1128.19172575, 1111.59689792,
+           1223.28953745, 454.66068679, 13.99680744, 1278.37704048, 1066.15033336]
 
     def __init__(self,
                  csv_file,
@@ -282,9 +289,16 @@ def build_transform(is_train, args):
     # mean = IMAGENET_DEFAULT_MEAN
     # std = IMAGENET_DEFAULT_STD
     # train transform
+    mean = CustomDatasetFromImages.mean
+    std = CustomDatasetFromImages.std
+    if args.dataset_type == 'sentinel':
+        mean = SentinelIndividualImageDataset.mean
+        std = SentinelIndividualImageDataset.std
+
     t = []
     if is_train:
         t.append(transforms.ToTensor())
+        t.append(transforms.Normalize(mean, std))
         t.append(
             transforms.RandomResizedCrop(args.input_size, scale=(0.2, 1.0), interpolation=3),  # 3 is bicubic
         )
@@ -299,6 +313,7 @@ def build_transform(is_train, args):
     size = int(args.input_size / crop_pct)
 
     t.append(transforms.ToTensor())
+    t.append(transforms.Normalize(mean, std))
     t.append(
         transforms.Resize(size, interpolation=Image.BICUBIC),  # to maintain same ratio w.r.t. 224 images
     )
