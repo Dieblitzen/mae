@@ -43,7 +43,7 @@ def get_mean_std_parrallel(dataset, num_workers):
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as ex:
         future_to_i = {ex.submit(get_sum_count, i, dataset): i for i in range(len(dataset))}
-        for future in concurrent.futures.as_completed(future_to_i):
+        for future in tqdm(concurrent.futures.as_completed(future_to_i)):
             try:
                 img_sum, img_sum_sq, img_count = future.result()
             except Exception as e:
