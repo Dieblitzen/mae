@@ -4,7 +4,9 @@ import json
 import numpy as np
 import os
 import time
+import wandb
 from pathlib import Path
+
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -128,6 +130,8 @@ def get_args_parser():
     parser.add_argument('--seed', default=0, type=int)
     parser.add_argument('--resume', default='',
                         help='resume from checkpoint')
+    parser.add_argument('--wandb', type=str, default=None,
+                        help="Wandb project name, eg: sentinel_finetune")
 
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
@@ -301,6 +305,13 @@ def main(args):
 
     misc.load_model(args=args, model_without_ddp=model_without_ddp, optimizer=optimizer, loss_scaler=loss_scaler)
 
+    # Set up wandb
+    if global_rank == 0 and args.wandb is not None:
+        wandb.login(key="68b7ffd0d1edfde176a0e9e543c2d7fab6b5f885")
+        wandb.init(project=args.wandb, entity="mae-sentinel")
+        wandb.config = args.__dict__
+        wandb.watch(model)
+
     if args.eval:
         test_stats = evaluate(data_loader_val, model, device)
         print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
@@ -344,6 +355,11 @@ def main(args):
                 log_writer.flush()
             with open(os.path.join(args.output_dir, "log.txt"), mode="a", encoding="utf-8") as f:
                 f.write(json.dumps(log_stats) + "\n")
+
+            try:
+                wandb.log(log_stats)
+            except ValueError:
+                print(f"Invalid stats?")
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))

@@ -88,7 +88,8 @@ def get_args_parser():
     parser.add_argument('--seed', default=0, type=int)
     parser.add_argument('--resume', default='',
                         help='resume from checkpoint')
-    parser.add_argument('--wandb', action='store_true', default=False)
+    parser.add_argument('--wandb', type=str, default=None,
+                        help="Wandb project name, eg: sentinel_pretrain")
 
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
@@ -186,9 +187,9 @@ def main(args):
     misc.load_model(args=args, model_without_ddp=model_without_ddp, optimizer=optimizer, loss_scaler=loss_scaler)
 
     # Set up wandb
-    if global_rank == 0 and args.wandb:
+    if global_rank == 0 and args.wandb is not None:
         wandb.login(key="68b7ffd0d1edfde176a0e9e543c2d7fab6b5f885")
-        wandb.init(project="sentinel_pretrain", entity="mae-sentinel")
+        wandb.init(project=args.wandb, entity="mae-sentinel")
         wandb.config = args.__dict__
         wandb.watch(model)
 
