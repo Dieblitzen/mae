@@ -172,6 +172,7 @@ class CustomDatasetFromImagesTemporal(Dataset):
 class FMoWTemporalStacked(SatelliteDataset):
     mean = [0.4182007312774658, 0.4214799106121063, 0.3991275727748871]
     std = [0.28774282336235046, 0.27541765570640564, 0.2764017581939697]
+    
     def __init__(self, csv_path, transform):
         """
         Args:
@@ -240,12 +241,12 @@ class FMoWTemporalStacked(SatelliteDataset):
 class SentinelIndividualImageDataset(SatelliteDataset):
     '''fMoW Dataset'''
     label_types = ['value', 'one-hot']
-    mean = [5.373300075531006, 4.644637107849121, 4.395181179046631, 4.455922603607178,
-            4.955841064453125, 6.452561378479004, 7.242629051208496, 6.91213846206665,
-            7.735781192779541, 2.28520131111145, 0.0579259991645813, 6.7927985191345215, 4.893798828125]
-    std = [2.482947826385498, 2.5501344203948975, 2.792647361755371, 3.7852203845977783,
-           3.7214980125427246, 4.345358848571777, 4.934760570526123, 4.835879325866699,
-           5.350536823272705, 1.8524693250656128, 0.056123387068510056, 5.138705730438232, 4.265106201171875]
+    mean = [1370.19151926, 1184.3824625 , 1120.77120066, 1136.26026392,
+            1263.73947144, 1645.40315151, 1846.87040806, 1762.59530783,
+            1972.62420416,  582.72633433,   14.77112979, 1732.16362238, 1247.91870117]
+    std = [633.15169573,  650.2842772 ,  712.12507725,  965.23119807,
+           948.9819932 , 1108.06650639, 1258.36394548, 1233.1492281 ,
+           1364.38688993,  472.37967789,   14.3114637 , 1310.36996126, 1087.6020813]
 
     def __init__(self,
                  csv_path,
@@ -331,7 +332,7 @@ class SentinelIndividualImageDataset(SatelliteDataset):
         selection = self.df.iloc[idx]
 
         # images = [torch.FloatTensor(rasterio.open(img_path).read()) for img_path in image_paths]
-        images = self.open_image(selection['image_path']) / 255
+        images = self.open_image(selection['image_path'])
 
         labels = self.categories.index(selection['category'])
 
@@ -343,6 +344,68 @@ class SentinelIndividualImageDataset(SatelliteDataset):
             'image_ids': selection['image_id'],
             'timestamps': selection['timestamp']
         }
+        return img_as_tensor, labels
+
+
+class JointDataset(SatelliteDataset):
+    def __init__(self, csv_path, sentinel_transform, rgb_transform,
+                 years=[*range(2000, 2021)],
+                 categories=None,
+                 label_type='value'):
+        super().__init__(in_c=16)
+        self.df = pd.read_csv(csv_path)
+        self.df = self.df[self.df['fmow_path'].notna()]  # Drop non-RGB sentinel?
+        self.df = self.df.sort_values(['category', 'location_id', 'timestamp'])
+
+        # Filter by category
+        self.categories = CATEGORIES
+        if categories is not None:
+            self.categories = categories
+            self.df = self.df.loc[categories]
+
+        # Filter by year
+        if years is not None:
+            self.df['year'] = [int(timestamp.split('-')[0]) for timestamp in self.df['timestamp']]
+            self.df = self.df[self.df['year'].isin(years)]
+
+        self.indices = self.df.index.unique().to_numpy()
+
+        self.sentinel_transform = sentinel_transform
+        self.rgb_transform = rgb_transform
+
+        if label_type not in self.label_types:
+            raise ValueError(
+                f'FMOWDataset label_type {label_type} not allowed. Label_type must be one of the following:',
+                ', '.join(self.label_types))
+        self.label_type = label_type
+
+    def read_tiff(self, img_path):
+        with rasterio.open(img_path) as data:
+            img = data.read()  # (c, h, w)
+
+        return img.transpose(1, 2, 0).astype(np.float32)  # (h, w, c)
+
+    def __getitem__(self, idx):
+        ''' Gets timeseries info for images in one area
+
+        Args:
+            idx: Index of loc in dataset
+        '''
+        selection = self.df.iloc[idx]
+
+        sentinel_image_path = selection["image_path"]
+        rgb_image_path = selection["fmow_path"]
+
+        # images = [torch.FloatTensor(rasterio.open(img_path).read()) for img_path in image_paths]
+        sentinel_image = self.read_tiff(sentinel_image_path)
+        rgb_image = Image.open(rgb_image_path)
+
+        sentinel_img_as_tensor = self.sentinel_transform(sentinel_image)  # (13, h, w)
+        rgb_img_as_tensor = self.rgb_transform(rgb_image)  # (3, h, w)
+        img_as_tensor = torch.cat((rgb_img_as_tensor, sentinel_img_as_tensor), dim=0)  # (16, h, w)
+
+        labels = self.categories.index(selection['category'])
+
         return img_as_tensor, labels
 
 
