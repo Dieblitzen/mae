@@ -36,7 +36,15 @@ CATEGORIES = ["airport", "airport_hangar", "airport_terminal", "amusement_park",
               "wind_farm", "zoo"]
 
 
-class CustomDatasetFromImages(Dataset):
+class SatelliteDataset(Dataset):
+    """
+    Abstract class.
+    """
+    def __init__(self, in_c):
+        self.in_c = in_c
+
+
+class CustomDatasetFromImages(SatelliteDataset):
     mean = [0.4182007312774658, 0.4214799106121063, 0.3991275727748871]
     std = [0.28774282336235046, 0.27541765570640564, 0.2764017581939697]
 
@@ -47,6 +55,7 @@ class CustomDatasetFromImages(Dataset):
             img_path (string): path to the folder where images are
             transform: pytorch transforms for transforms and tensor conversion
         """
+        super().__init__(in_c=3)
         # Transforms
         self.transforms = transform
         # Read the csv file
@@ -160,13 +169,9 @@ class CustomDatasetFromImagesTemporal(Dataset):
         return self.data_len
 
 
-class FMoWTemporalStacked(Dataset):
-    mean = [0.4182007312774658, 0.4214799106121063, 0.3991275727748871,
-            0.4182007312774658, 0.4214799106121063, 0.3991275727748871,
-            0.4182007312774658, 0.4214799106121063, 0.3991275727748871]
-    std = [0.28774282336235046, 0.27541765570640564, 0.2764017581939697,
-           0.28774282336235046, 0.27541765570640564, 0.2764017581939697,
-           0.28774282336235046, 0.27541765570640564, 0.2764017581939697]
+class FMoWTemporalStacked(SatelliteDataset):
+    mean = [0.4182007312774658, 0.4214799106121063, 0.3991275727748871]
+    std = [0.28774282336235046, 0.27541765570640564, 0.2764017581939697]
     def __init__(self, csv_path, transform):
         """
         Args:
@@ -174,6 +179,7 @@ class FMoWTemporalStacked(Dataset):
             img_path (string): path to the folder where images are
             transform: pytorch transforms for transforms and tensor conversion
         """
+        super().__init__(in_c=9)
         # Transforms
         self.transforms = transform
         # Read the csv file
@@ -231,7 +237,7 @@ class FMoWTemporalStacked(Dataset):
         return self.data_len
 
 
-class SentinelIndividualImageDataset(Dataset):
+class SentinelIndividualImageDataset(SatelliteDataset):
     '''fMoW Dataset'''
     label_types = ['value', 'one-hot']
     mean = [5.373300075531006, 4.644637107849121, 4.395181179046631, 4.455922603607178,
@@ -263,6 +269,7 @@ class SentinelIndividualImageDataset(Dataset):
             label_type (string): 'values' for single regression label, 'one-hot' for one hot labels
             resize: Size to load images as
         """
+        super().__init__(in_c=13)
         self.df = pd.read_csv(csv_path) \
             .sort_values(['category', 'location_id', 'timestamp'])
 
@@ -339,7 +346,7 @@ class SentinelIndividualImageDataset(Dataset):
         return img_as_tensor, labels
 
 
-def build_fmow_dataset(is_train, args):
+def build_fmow_dataset(is_train, args) -> SatelliteDataset:
     csv_path = os.path.join(args.train_path if is_train else args.test_path)
 
     if args.dataset_type == 'rgb':

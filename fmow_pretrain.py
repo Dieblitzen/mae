@@ -155,7 +155,7 @@ def main(args):
     )
     
     # define the model
-    in_c = len(dataset_train.mean)
+    in_c = dataset.in_c
     model = models_mae.__dict__[args.model](in_chans=in_c, norm_pix_loss=args.norm_pix_loss)
 
     model.to(device)
