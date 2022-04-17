@@ -155,7 +155,7 @@ def main(args):
     )
     
     # define the model
-    in_c = 13 if args.dataset_type == 'sentinel' else 3
+    in_c = len(dataset_train.mean)
     model = models_mae.__dict__[args.model](in_chans=in_c, norm_pix_loss=args.norm_pix_loss)
 
     model.to(device)

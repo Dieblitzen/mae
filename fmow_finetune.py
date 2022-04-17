@@ -226,7 +226,7 @@ def main(args):
             prob=args.mixup_prob, switch_prob=args.mixup_switch_prob, mode=args.mixup_mode,
             label_smoothing=args.smoothing, num_classes=args.nb_classes)
 
-    in_c = 13 if args.dataset_type == 'sentinel' else 3
+    in_c = len(dataset_train.mean)
     model = models_vit.__dict__[args.model](
         in_chans=in_c,
         num_classes=args.nb_classes,
