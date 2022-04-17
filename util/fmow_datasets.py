@@ -5,6 +5,7 @@ import warnings
 import random
 from glob import glob
 
+import torch
 from torch.utils.data.dataset import Dataset
 from torchvision import datasets, transforms
 from PIL import Image
@@ -159,6 +160,77 @@ class CustomDatasetFromImagesTemporal(Dataset):
         return self.data_len
 
 
+class FMoWTemporalStacked(Dataset):
+    mean = [0.4182007312774658, 0.4214799106121063, 0.3991275727748871,
+            0.4182007312774658, 0.4214799106121063, 0.3991275727748871,
+            0.4182007312774658, 0.4214799106121063, 0.3991275727748871]
+    std = [0.28774282336235046, 0.27541765570640564, 0.2764017581939697,
+           0.28774282336235046, 0.27541765570640564, 0.2764017581939697,
+           0.28774282336235046, 0.27541765570640564, 0.2764017581939697]
+    def __init__(self, csv_path, transform):
+        """
+        Args:
+            csv_path (string): path to csv file
+            img_path (string): path to the folder where images are
+            transform: pytorch transforms for transforms and tensor conversion
+        """
+        # Transforms
+        self.transforms = transform
+        # Read the csv file
+        self.data_info = pd.read_csv(csv_path, header=0)
+        # First column contains the image paths
+        self.image_arr = np.asarray(self.data_info.iloc[:, 1])
+        # Second column is the labels
+        self.label_arr = np.asarray(self.data_info.iloc[:, 0])
+        # Calculate len
+        self.data_len = len(self.data_info.index)
+
+        self.min_year = 2002
+
+    def __getitem__(self, index):
+        # Get image name from the pandas df
+        single_image_name_1 = self.image_arr[index]
+
+        splt = single_image_name_1.rsplit('/', 1)
+        base_path = splt[0]
+        fname = splt[1]
+        suffix = fname[-15:]
+        prefix = fname[:-15].rsplit('_', 1)
+        regexp = '{}/{}_*{}'.format(base_path, prefix[0], suffix)
+        temporal_files = glob(regexp)
+        temporal_files.remove(single_image_name_1)
+        if temporal_files == []:
+            single_image_name_2 = single_image_name_1
+            single_image_name_3 = single_image_name_1
+        elif len(temporal_files) == 1:
+            single_image_name_2 = temporal_files[0]
+            single_image_name_3 = temporal_files[0]
+        else:
+            single_image_name_2 = random.choice(temporal_files)
+            while True:
+                single_image_name_3 = random.choice(temporal_files)
+                if single_image_name_3 != single_image_name_2:
+                    break
+
+        img_as_img_1 = Image.open(single_image_name_1)
+        img_as_tensor_1 = self.transforms(img_as_img_1)  # (3, h, w)
+
+        img_as_img_2 = Image.open(single_image_name_2)
+        img_as_tensor_2 = self.transforms(img_as_img_2)  # (3, h, w)
+
+        img_as_img_3 = Image.open(single_image_name_3)
+        img_as_tensor_3 = self.transforms(img_as_img_3)  # (3, h, w)
+
+        # Get label(class) of the image based on the cropped pandas column
+        single_image_label = self.label_arr[index]
+
+        img = torch.cat((img_as_tensor_1, img_as_tensor_2, img_as_tensor_3), dim=0)  # (9, h, w)
+        return (img, single_image_label)
+
+    def __len__(self):
+        return self.data_len
+
+
 class SentinelIndividualImageDataset(Dataset):
     '''fMoW Dataset'''
     label_types = ['value', 'one-hot']
@@ -170,7 +242,7 @@ class SentinelIndividualImageDataset(Dataset):
            5.350536823272705, 1.8524693250656128, 0.056123387068510056, 5.138705730438232, 4.265106201171875]
 
     def __init__(self,
-                 csv_file,
+                 csv_path,
                  transform,
                  years=[*range(2000, 2021)],
                  categories=None,
@@ -179,7 +251,7 @@ class SentinelIndividualImageDataset(Dataset):
         """ Initialize the dataset.
 
         Args:
-            csv_file (string): Path to the csv file with annotations.
+            csv_path (string): Path to the csv file with annotations.
             years (list, optional): List of years to take images from, None to not filter
             categories (list, optional): List of categories to take images from, None to not filter
             pre_transform (callable, optional): Optional transformation to be applied to individual images
@@ -191,7 +263,7 @@ class SentinelIndividualImageDataset(Dataset):
             label_type (string): 'values' for single regression label, 'one-hot' for one hot labels
             resize: Size to load images as
         """
-        self.df = pd.read_csv(csv_file) \
+        self.df = pd.read_csv(csv_path) \
             .sort_values(['category', 'location_id', 'timestamp'])
 
         # Filter by category
@@ -268,14 +340,23 @@ class SentinelIndividualImageDataset(Dataset):
 
 
 def build_fmow_dataset(is_train, args):
-    transform = build_transform(is_train, args)
-
     csv_path = os.path.join(args.train_path if is_train else args.test_path)
 
     if args.dataset_type == 'rgb':
+        mean = CustomDatasetFromImages.mean
+        std = CustomDatasetFromImages.std
+        transform = build_transform(is_train, args.input_size, mean, std)
         dataset = CustomDatasetFromImages(csv_path, transform)
     elif args.dataset_type == 'sentinel':
+        mean = SentinelIndividualImageDataset.mean
+        std = SentinelIndividualImageDataset.std
+        transform = build_transform(is_train, args.input_size, mean, std)
         dataset = SentinelIndividualImageDataset(csv_path, transform)
+    elif args.dataset_type == 'rgb_temporal_stacked':
+        mean = FMoWTemporalStacked.mean
+        std = FMoWTemporalStacked.std
+        transform = build_transform(is_train, args.input_size, mean, std)
+        dataset = FMoWTemporalStacked(csv_path, transform)
     elif args.dataset_type == 'combined':
         raise NotImplementedError("combined not yet implemented")
     else:
@@ -285,39 +366,34 @@ def build_fmow_dataset(is_train, args):
     return dataset
 
 
-def build_transform(is_train, args):
+def build_transform(is_train, input_size, mean, std):
     # mean = IMAGENET_DEFAULT_MEAN
     # std = IMAGENET_DEFAULT_STD
     # train transform
-    mean = CustomDatasetFromImages.mean
-    std = CustomDatasetFromImages.std
-    if args.dataset_type == 'sentinel':
-        mean = SentinelIndividualImageDataset.mean
-        std = SentinelIndividualImageDataset.std
 
     t = []
     if is_train:
         t.append(transforms.ToTensor())
         t.append(transforms.Normalize(mean, std))
         t.append(
-            transforms.RandomResizedCrop(args.input_size, scale=(0.2, 1.0), interpolation=3),  # 3 is bicubic
+            transforms.RandomResizedCrop(input_size, scale=(0.2, 1.0), interpolation=3),  # 3 is bicubic
         )
         t.append(transforms.RandomHorizontalFlip())
         return transforms.Compose(t)
 
     # eval transform
-    if args.input_size <= 224:
+    if input_size <= 224:
         crop_pct = 224 / 256
     else:
         crop_pct = 1.0
-    size = int(args.input_size / crop_pct)
+    size = int(input_size / crop_pct)
 
     t.append(transforms.ToTensor())
     t.append(transforms.Normalize(mean, std))
     t.append(
         transforms.Resize(size, interpolation=Image.BICUBIC),  # to maintain same ratio w.r.t. 224 images
     )
-    t.append(transforms.CenterCrop(args.input_size))
+    t.append(transforms.CenterCrop(input_size))
 
     # t.append(transforms.Normalize(mean, std))
     return transforms.Compose(t)
