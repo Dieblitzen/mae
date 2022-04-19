@@ -163,7 +163,6 @@ def main(args):
     else:
         model = models_mae.__dict__[args.model](in_chans=dataset_train.in_c,
                                                 norm_pix_loss=args.norm_pix_loss)
-
     model.to(device)
 
     model_without_ddp = model
