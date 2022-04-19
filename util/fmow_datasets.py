@@ -359,8 +359,7 @@ class JointDataset(SatelliteDataset):
 
     def __init__(self, csv_path, sentinel_transform, rgb_transform,
                  strict_joint=True, years=[*range(2000, 2021)],
-                 categories=None,
-                 label_type='value'):
+                 categories=None):
         super().__init__(in_c=16)
         self.df = pd.read_csv(csv_path)
         if strict_joint:
@@ -382,12 +381,6 @@ class JointDataset(SatelliteDataset):
 
         self.sentinel_transform = sentinel_transform
         self.rgb_transform = rgb_transform
-
-        if label_type not in self.label_types:
-            raise ValueError(
-                f'FMOWDataset label_type {label_type} not allowed. Label_type must be one of the following:',
-                ', '.join(self.label_types))
-        self.label_type = label_type
 
     def read_tiff(self, img_path):
         with rasterio.open(img_path) as data:
