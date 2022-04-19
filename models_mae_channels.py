@@ -213,6 +213,7 @@ class MaskedAutoencoderChannelViT(nn.Module):
         x = torch.cat((cls_tokens, x), dim=1)  # (N, c*L + 1, D)
 
         # apply Transformer blocks
+        print(x.shape)
         for blk in self.blocks:
             x = blk(x)
         x = self.norm(x)
@@ -284,7 +285,7 @@ class MaskedAutoencoderChannelViT(nn.Module):
 
 def mae_vit_base_patch16_dec512d8b(**kwargs):
     model = MaskedAutoencoderChannelViT(
-        patch_size=16, channel_embed=256, embed_dim=768, depth=12, num_heads=12,
+        patch_size=16, channel_embed=128, embed_dim=512, depth=12, num_heads=8,
         decoder_channel_embed=128, decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16,
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
