@@ -382,6 +382,9 @@ class JointDataset(SatelliteDataset):
         self.sentinel_transform = sentinel_transform
         self.rgb_transform = rgb_transform
 
+    def __len__(self):
+        return len(self.df)
+
     def read_tiff(self, img_path):
         with rasterio.open(img_path) as data:
             img = data.read()  # (c, h, w)
