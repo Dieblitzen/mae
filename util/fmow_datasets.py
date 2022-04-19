@@ -348,13 +348,23 @@ class SentinelIndividualImageDataset(SatelliteDataset):
 
 
 class JointDataset(SatelliteDataset):
+    mean = [0.4182007312774658, 0.4214799106121063, 0.3991275727748871,  # RGB
+            1370.19151926, 1184.3824625 , 1120.77120066, 1136.26026392,  # Sentinel
+            1263.73947144, 1645.40315151, 1846.87040806, 1762.59530783,
+            1972.62420416,  582.72633433,   14.77112979, 1732.16362238, 1247.91870117]
+    std = [0.28774282336235046, 0.27541765570640564, 0.2764017581939697,  # RGB
+           633.15169573,  650.2842772 ,  712.12507725,  965.23119807,  # Sentinel
+           948.9819932 , 1108.06650639, 1258.36394548, 1233.1492281 ,
+           1364.38688993,  472.37967789,   14.3114637 , 1310.36996126, 1087.6020813]
+
     def __init__(self, csv_path, sentinel_transform, rgb_transform,
-                 years=[*range(2000, 2021)],
+                 strict_joint=True, years=[*range(2000, 2021)],
                  categories=None,
                  label_type='value'):
         super().__init__(in_c=16)
         self.df = pd.read_csv(csv_path)
-        self.df = self.df[self.df['fmow_path'].notna()]  # Drop non-RGB sentinel?
+        if strict_joint:
+            self.df = self.df[self.df['fmow_path'].notna()]  # Drop non-RGB sentinel?
         self.df = self.df.sort_values(['category', 'location_id', 'timestamp'])
 
         # Filter by category
@@ -427,6 +437,12 @@ def build_fmow_dataset(is_train, args) -> SatelliteDataset:
         std = FMoWTemporalStacked.std
         transform = build_transform(is_train, args.input_size, mean, std)
         dataset = FMoWTemporalStacked(csv_path, transform)
+    elif args.dataset_type == 'strict_joint':
+        rgb_mean, rgb_std = CustomDatasetFromImages.mean, CustomDatasetFromImages.std
+        sent_mean, sent_std = SentinelIndividualImageDataset.mean, SentinelIndividualImageDataset.std
+        rgb_transform = build_transform(is_train, args.input_size, rgb_mean, rgb_std)
+        sent_transform = build_transform(is_train, args.input_size, sent_mean, sent_std)
+        dataset = JointDataset(csv_path, sent_transform, rgb_transform, strict_joint=True)
     elif args.dataset_type == 'combined':
         raise NotImplementedError("combined not yet implemented")
     else:
