@@ -31,6 +31,7 @@ from util.fmow_datasets import build_fmow_dataset
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
 
 import models_mae
+import models_mae_channels
 
 from engine_pretrain import train_one_epoch
 
@@ -44,6 +45,7 @@ def get_args_parser():
                         help='Accumulate gradient iterations (for increasing the effective batch size under memory constraints)')
 
     # Model parameters
+    parser.add_argument('--indp_channel', action='store_true', help='Use indp channel model')
     parser.add_argument('--model', default='mae_vit_base_patch16', type=str, metavar='MODEL',
                         help='Name of model to train')
 
@@ -155,7 +157,12 @@ def main(args):
     )
     
     # define the model
-    model = models_mae.__dict__[args.model](in_chans=dataset_train.in_c, norm_pix_loss=args.norm_pix_loss)
+    if args.indp_channel:
+        model = models_mae_channels.__dict__[args.model](in_chans=dataset_train.in_c,
+                                                         norm_pix_loss=args.norm_pix_loss)
+    else:
+        model = models_mae.__dict__[args.model](in_chans=dataset_train.in_c,
+                                                norm_pix_loss=args.norm_pix_loss)
 
     model.to(device)
 
