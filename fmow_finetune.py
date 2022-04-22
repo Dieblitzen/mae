@@ -27,7 +27,7 @@ from util.pos_embed import interpolate_pos_embed
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
 
 import models_vit
-import models_mae_channels
+import models_vit_channels
 
 from engine_finetune import train_one_epoch, evaluate
 
