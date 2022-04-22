@@ -231,12 +231,12 @@ def main(args):
     # Define the model
     if args.indp_channel:
         model = models_vit_channels.__dict__[args.model](
-            in_chans=dataset_train.in_c, num_classes=args.nb_classes,
+            img_size=args.input_size, in_chans=dataset_train.in_c, num_classes=args.nb_classes,
             drop_path_rate=args.drop_path, global_pool=args.global_pool,
         )
     else:
         model = models_vit.__dict__[args.model](
-            in_chans=dataset_train.in_c, num_classes=args.nb_classes,
+            img_size=args.input_size, in_chans=dataset_train.in_c, num_classes=args.nb_classes,
             drop_path_rate=args.drop_path, global_pool=args.global_pool,
         )
 
