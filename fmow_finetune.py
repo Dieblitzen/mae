@@ -27,6 +27,7 @@ from util.pos_embed import interpolate_pos_embed
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
 
 import models_vit
+import models_vit_channels
 
 from engine_finetune import train_one_epoch, evaluate
 
@@ -40,6 +41,7 @@ def get_args_parser():
                         help='Accumulate gradient iterations (for increasing the effective batch size under memory constraints)')
 
     # Model parameters
+    parser.add_argument('--indp_channel', action='store_true', help='Use indp channel model')
     parser.add_argument('--model', default='vit_base_patch16', type=str, metavar='MODEL',
                         help='Name of model to train')
 
@@ -226,12 +228,17 @@ def main(args):
             prob=args.mixup_prob, switch_prob=args.mixup_switch_prob, mode=args.mixup_mode,
             label_smoothing=args.smoothing, num_classes=args.nb_classes)
 
-    model = models_vit.__dict__[args.model](
-        in_chans=dataset_train.in_c,
-        num_classes=args.nb_classes,
-        drop_path_rate=args.drop_path,
-        global_pool=args.global_pool,
-    )
+    # Define the model
+    if args.indp_channel:
+        model = models_vit_channels.__dict__[args.model](
+            img_size=args.input_size, in_chans=dataset_train.in_c, num_classes=args.nb_classes,
+            drop_path_rate=args.drop_path, global_pool=args.global_pool,
+        )
+    else:
+        model = models_vit.__dict__[args.model](
+            img_size=args.input_size, in_chans=dataset_train.in_c, num_classes=args.nb_classes,
+            drop_path_rate=args.drop_path, global_pool=args.global_pool,
+        )
 
     if args.finetune and not args.eval:
         checkpoint = torch.load(args.finetune, map_location='cpu')
@@ -239,7 +246,8 @@ def main(args):
         print("Load pre-trained checkpoint from: %s" % args.finetune)
         checkpoint_model = checkpoint['model']
         state_dict = model.state_dict()
-        for k in ['patch_embed.proj.weight', 'patch_embed.proj.bias', 'head.weight', 'head.bias']:
+        # TODO: Do something smarter?
+        for k in ['pos_embed', 'patch_embed.proj.weight', 'patch_embed.proj.bias', 'head.weight', 'head.bias']:
             if k in checkpoint_model and checkpoint_model[k].shape != state_dict[k].shape:
                 print(f"Removing key {k} from pretrained checkpoint")
                 del checkpoint_model[k]
