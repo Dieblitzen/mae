@@ -15,6 +15,7 @@ import torch
 import torch.nn as nn
 
 import timm.models.vision_transformer
+from timm.models.vision_transformer import PatchEmbed
 from util.pos_embed import get_2d_sincos_pos_embed, get_1d_sincos_pos_embed_from_grid
 
 
@@ -23,9 +24,12 @@ class ChannelsVisionTransformer(timm.models.vision_transformer.VisionTransformer
     """
     def __init__(self, global_pool=False, channel_embed=256, **kwargs):
         super().__init__(**kwargs)
-
+        img_size = kwargs['img_size']
+        patch_size = kwargs['patch_size']
         in_c = kwargs['in_chans']
         embed_dim = kwargs['embed_dim']
+
+        self.patch_embed = PatchEmbed(img_size, patch_size, 1, embed_dim)
         num_patches = self.patch_embed.num_patches
 
         # Positional and channel embed
