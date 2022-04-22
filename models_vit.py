@@ -15,6 +15,7 @@ import torch
 import torch.nn as nn
 
 import timm.models.vision_transformer
+from util.pos_embed import get_2d_sincos_pos_embed
 
 
 class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
@@ -22,6 +23,11 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
     """
     def __init__(self, global_pool=False, **kwargs):
         super(VisionTransformer, self).__init__(**kwargs)
+
+        # Added by Samar, need default pos embedding
+        pos_embed = get_2d_sincos_pos_embed(self.pos_embed.shape[-1], int(self.patch_embed.num_patches ** .5),
+                                            cls_token=True)
+        self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
 
         self.global_pool = global_pool
         if self.global_pool:
