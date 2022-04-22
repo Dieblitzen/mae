@@ -42,6 +42,12 @@ class ChannelsVisionTransformer(timm.models.vision_transformer.VisionTransformer
         channel_embed = get_1d_sincos_pos_embed_from_grid(self.channel_embed.shape[-1], torch.arange(in_c).numpy())
         self.channel_embed.data.copy_(torch.from_numpy(channel_embed).float().unsqueeze(0))
 
+        # Extra embedding for cls to fill embed_dim
+        self.channel_cls_embed = nn.Parameter(torch.zeros(1, 1, channel_embed))
+        channel_cls_embed = get_1d_sincos_pos_embed_from_grid(self.channel_cls_embed.shape[-1],
+                                                              torch.arange(in_c, in_c+1).numpy())
+        self.channel_cls_embed.data.copy_(torch.from_numpy(channel_cls_embed).float().unsqueeze(0))
+
         self.global_pool = global_pool
         if self.global_pool:
             norm_layer = kwargs['norm_layer']
@@ -73,8 +79,9 @@ class ChannelsVisionTransformer(timm.models.vision_transformer.VisionTransformer
         x = x + pos_channel  # (N, c, L, D)
         x = x.view(b, -1, D)  # (N, c*L, D)
 
+        cls_pos_channel = torch.cat((self.pos_embed[:, :1, :], self.channel_cls_embed), dim=-1)  # (1, 1, D)
         # stole cls_tokens impl from Phil Wang, thanks
-        cls_tokens = self.pos_embed[:, :1, :] + self.cls_token.expand(b, -1, -1)
+        cls_tokens = cls_pos_channel+ self.cls_token.expand(b, -1, -1)
         x = torch.cat((cls_tokens, x), dim=1)  # (N, 1 + c*L, D)
         x = self.pos_drop(x)
 
