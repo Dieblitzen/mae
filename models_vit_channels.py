@@ -47,12 +47,31 @@ class ChannelsVisionTransformer(timm.models.vision_transformer.VisionTransformer
             del self.norm  # remove the original norm
 
     def forward_features(self, x):
-        B = x.shape[0]
-        x = self.patch_embed(x)
+        # x is (N, C, H, W)
+        b, c, h, w = x.shape
 
-        cls_tokens = self.cls_token.expand(B, -1, -1)  # stole cls_tokens impl from Phil Wang, thanks
-        x = torch.cat((cls_tokens, x), dim=1)
-        x = x + self.pos_embed
+        # Call to contiguous to ensure correct reshaping
+        x_inp = x.view(b * c, 1, h, w)
+        x_embed = self.patch_embed(x_inp).contiguous()  # (N*C, L, D)
+        _, L, D = x_embed.shape
+        x = x_embed.view(b, c, L, D)  # (N, C, L, D)
+
+        # add channel embed
+        channel_embed = self.channel_embed.unsqueeze(2)  # (1, c, 1, cD)
+        pos_embed = self.pos_embed[:, 1:, :].unsqueeze(1)  # (1, 1, L, pD)
+
+        # Channel embed same across (x,y) position, and pos embed same across channel (c)
+        channel_embed = channel_embed.expand(-1, -1, pos_embed.shape[2], -1)  # (1, c, L, cD)
+        pos_embed = pos_embed.expand(-1, channel_embed.shape[1], -1, -1)  # (1, c, L, pD)
+        pos_channel = torch.cat((pos_embed, channel_embed), dim=-1)  # (1, c, L, D)
+
+        # add pos embed w/o cls token
+        x = x + pos_channel  # (N, c, L, D)
+        x = x.view(b, -1, D)  # (N, c*L, D)
+
+        # stole cls_tokens impl from Phil Wang, thanks
+        cls_tokens = self.pos_embed[:, :1, :] + self.cls_token.expand(b, -1, -1)
+        x = torch.cat((cls_tokens, x), dim=1)  # (N, 1 + c*L, D)
         x = self.pos_drop(x)
 
         for blk in self.blocks:
