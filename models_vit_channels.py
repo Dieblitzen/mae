@@ -35,8 +35,7 @@ class ChannelsVisionTransformer(timm.models.vision_transformer.VisionTransformer
         self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
 
         self.channel_embed = nn.Parameter(torch.zeros(1, in_c, channel_embed))
-        channel_embed = get_1d_sincos_pos_embed_from_grid(self.channel_embed.shape[-1],
-                                                          torch.arange(self.in_c).numpy())
+        channel_embed = get_1d_sincos_pos_embed_from_grid(self.channel_embed.shape[-1], torch.arange(in_c).numpy())
         self.channel_embed.data.copy_(torch.from_numpy(channel_embed).float().unsqueeze(0))
 
         self.global_pool = global_pool
