@@ -39,8 +39,8 @@ class ChannelsVisionTransformer(timm.models.vision_transformer.VisionTransformer
         self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
 
         self.channel_embed = nn.Parameter(torch.zeros(1, in_c, channel_embed))
-        channel_embed = get_1d_sincos_pos_embed_from_grid(self.channel_embed.shape[-1], torch.arange(in_c).numpy())
-        self.channel_embed.data.copy_(torch.from_numpy(channel_embed).float().unsqueeze(0))
+        chan_embed = get_1d_sincos_pos_embed_from_grid(self.channel_embed.shape[-1], torch.arange(in_c).numpy())
+        self.channel_embed.data.copy_(torch.from_numpy(chan_embed).float().unsqueeze(0))
 
         # Extra embedding for cls to fill embed_dim
         self.channel_cls_embed = nn.Parameter(torch.zeros(1, 1, channel_embed))
