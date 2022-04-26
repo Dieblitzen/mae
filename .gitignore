@@ -1,0 +1,6 @@
+*.pyc
+*.png
+out/
+output_dir/
+wandb/
+nohup.out

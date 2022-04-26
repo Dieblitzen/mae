@@ -7,7 +7,7 @@ from glob import glob
 
 import torch
 from torch.utils.data.dataset import Dataset
-from torchvision import datasets, transforms
+from torchvision import datasets, transforms, utils
 from PIL import Image
 import rasterio
 from rasterio import logging
@@ -357,10 +357,10 @@ class JointDataset(SatelliteDataset):
            948.9819932 , 1108.06650639, 1258.36394548, 1233.1492281 ,
            1364.38688993,  472.37967789,   14.3114637 , 1310.36996126, 1087.6020813]
 
-    def __init__(self, csv_path, sentinel_transform, rgb_transform,
+    def __init__(self, csv_path, sentinel_transform, rgb_transform, joint_transform,
                  strict_joint=True, years=[*range(2000, 2021)],
                  categories=None):
-        super().__init__(in_c=16)
+        super().__init__(in_c=14)
         self.df = pd.read_csv(csv_path)
         if strict_joint:
             self.df = self.df[self.df['fmow_path'].notna()]  # Drop non-RGB sentinel?
@@ -381,6 +381,7 @@ class JointDataset(SatelliteDataset):
 
         self.sentinel_transform = sentinel_transform
         self.rgb_transform = rgb_transform
+        self.joint_transform = joint_transform
 
     def __len__(self):
         return len(self.df)
@@ -388,6 +389,8 @@ class JointDataset(SatelliteDataset):
     def read_tiff(self, img_path):
         with rasterio.open(img_path) as data:
             img = data.read()  # (c, h, w)
+            # print(img.shape)
+            # print(img[0].var())
 
         return img.transpose(1, 2, 0).astype(np.float32)  # (h, w, c)
 
@@ -405,10 +408,43 @@ class JointDataset(SatelliteDataset):
         # images = [torch.FloatTensor(rasterio.open(img_path).read()) for img_path in image_paths]
         sentinel_image = self.read_tiff(sentinel_image_path)
         rgb_image = Image.open(rgb_image_path)
+        # print(sentinel_image.shape, np.asarray(rgb_image).shape)
 
         sentinel_img_as_tensor = self.sentinel_transform(sentinel_image)  # (13, h, w)
+        # print(sentinel_img_as_tensor.shape)
         rgb_img_as_tensor = self.rgb_transform(rgb_image)  # (3, h, w)
-        img_as_tensor = torch.cat((rgb_img_as_tensor, sentinel_img_as_tensor), dim=0)  # (16, h, w)
+        ss1, ss2 = sentinel_img_as_tensor.shape[1:]
+        rs1, rs2 = rgb_img_as_tensor.shape[1:]
+        if ss1 == rs1 and rs1 == 224:
+            if ss2 > rs2:
+                d = ss2 - rs2
+                sentinel_img_as_tensor = sentinel_img_as_tensor[:, :, d // 2:-(d - d // 2)]
+            elif ss2 < rs2:
+                d = rs2 - ss2
+                rgb_img_as_tensor = rgb_img_as_tensor[:, :, d // 2:-(d - d // 2)]
+            assert rgb_img_as_tensor.shape[1:] == sentinel_img_as_tensor.shape[1:], (rgb_img_as_tensor.shape, sentinel_img_as_tensor.shape)
+        elif ss2 == rs2 and rs2 == 224:
+            if ss1 > rs1:
+                d = ss1 - rs1
+                sentinel_img_as_tensor = sentinel_img_as_tensor[:, d // 2:-(d - d // 2)]
+            elif ss1 < rs1:
+                d = rs1 - ss1
+                rgb_img_as_tensor = rgb_img_as_tensor[:, d // 2:-(d - d // 2)]
+            assert rgb_img_as_tensor.shape[1:] == sentinel_img_as_tensor.shape[1:], (rgb_img_as_tensor.shape, sentinel_img_as_tensor.shape)
+        
+        if rgb_img_as_tensor.shape[1:] == sentinel_img_as_tensor.shape[1:]:
+            img_as_tensor = torch.cat((rgb_img_as_tensor, sentinel_img_as_tensor), dim=0)  # (16, h, w)
+            img_as_tensor = self.joint_transform(img_as_tensor)
+            # utils.save_image(img_as_tensor[:3], "test1.png")
+            # for i in range(13):
+            #     utils.save_image(img_as_tensor[3 + i:4 + i], f"test{i+2}.png")
+            # utils.save_image(img_as_tensor[4:5], "test3.png")
+            # utils.save_image(img_as_tensor[5:6], "test4.png")
+        else:
+            print('abnormal', rgb_img_as_tensor.shape, sentinel_img_as_tensor.shape)
+            rgb_img_as_tensor = transforms.CenterCrop(224)(rgb_img_as_tensor)
+            sentinel_img_as_tensor = transforms.CenterCrop(224)(sentinel_img_as_tensor)
+            img_as_tensor = torch.cat((rgb_img_as_tensor, sentinel_img_as_tensor), dim=0)  # (16, h, w)
 
         labels = self.categories.index(selection['category'])
 
@@ -436,9 +472,9 @@ def build_fmow_dataset(is_train, args) -> SatelliteDataset:
     elif args.dataset_type == 'strict_joint':
         rgb_mean, rgb_std = CustomDatasetFromImages.mean, CustomDatasetFromImages.std
         sent_mean, sent_std = SentinelIndividualImageDataset.mean, SentinelIndividualImageDataset.std
-        rgb_transform = build_transform(is_train, args.input_size, rgb_mean, rgb_std)
-        sent_transform = build_transform(is_train, args.input_size, sent_mean, sent_std)
-        dataset = JointDataset(csv_path, sent_transform, rgb_transform, strict_joint=True)
+        rgb_transform, joint_transform = build_transform(is_train, args.input_size, rgb_mean, rgb_std)
+        sent_transform, _ = build_transform(is_train, args.input_size, sent_mean, sent_std)
+        dataset = JointDataset(csv_path, sent_transform, rgb_transform, joint_transform, strict_joint=True)
     elif args.dataset_type == 'combined':
         raise NotImplementedError("combined not yet implemented")
     else:
@@ -454,14 +490,19 @@ def build_transform(is_train, input_size, mean, std):
     # train transform
 
     t = []
+    t_joint = []
     if is_train:
         t.append(transforms.ToTensor())
-        t.append(transforms.Normalize(mean, std))
+        # t.append(transforms.Normalize(mean, std))
+        # t.append(
+        #     transforms.RandomResizedCrop(input_size, scale=(0.2, 1.0), interpolation=3),  # 3 is bicubic
+        # )
         t.append(
-            transforms.RandomResizedCrop(input_size, scale=(0.2, 1.0), interpolation=3),  # 3 is bicubic
+            transforms.Resize(input_size, interpolation=Image.BICUBIC),  # to maintain same ratio w.r.t. 224 images
         )
-        t.append(transforms.RandomHorizontalFlip())
-        return transforms.Compose(t)
+        t_joint.append(transforms.RandomCrop(input_size))
+        t_joint.append(transforms.RandomHorizontalFlip())
+        return transforms.Compose(t), transforms.Compose(t_joint)
 
     # eval transform
     if input_size <= 224:
@@ -475,7 +516,7 @@ def build_transform(is_train, input_size, mean, std):
     t.append(
         transforms.Resize(size, interpolation=Image.BICUBIC),  # to maintain same ratio w.r.t. 224 images
     )
-    t.append(transforms.CenterCrop(input_size))
+    t_joint.append(transforms.CenterCrop(input_size))
 
     # t.append(transforms.Normalize(mean, std))
-    return transforms.Compose(t)
+    return transforms.Compose(t), transforms.Compose(t_joint)
