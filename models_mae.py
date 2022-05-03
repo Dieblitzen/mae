@@ -94,28 +94,32 @@ class MaskedAutoencoderViT(nn.Module):
             nn.init.constant_(m.bias, 0)
             nn.init.constant_(m.weight, 1.0)
 
-    def patchify(self, imgs):
+    def patchify(self, imgs, p, c):
         """
         imgs: (N, C, H, W)
+        p: Patch embed patch size
+        c: Num channels
         x: (N, L, patch_size**2 *C)
         """
-        p = self.patch_embed.patch_size[0]
+        # p = self.patch_embed.patch_size[0]
         assert imgs.shape[2] == imgs.shape[3] and imgs.shape[2] % p == 0
 
-        c = self.in_c
+        # c = self.in_c
         h = w = imgs.shape[2] // p
         x = imgs.reshape(shape=(imgs.shape[0], c, h, p, w, p))
         x = torch.einsum('nchpwq->nhwpqc', x)
         x = x.reshape(shape=(imgs.shape[0], h * w, p**2 * c))
         return x
 
-    def unpatchify(self, x):
+    def unpatchify(self, x, p, c):
         """
         x: (N, L, patch_size**2 *C)
+        p: Patch embed patch size
+        c: Num channels
         imgs: (N, C, H, W)
         """
-        c = self.in_c
-        p = self.patch_embed.patch_size[0]
+        # c = self.in_c
+        # p = self.patch_embed.patch_size[0]
         h = w = int(x.shape[1]**.5)
         assert h * w == x.shape[1]
         
@@ -205,7 +209,7 @@ class MaskedAutoencoderViT(nn.Module):
         pred: [N, L, p*p*3]
         mask: [N, L], 0 is keep, 1 is remove, 
         """
-        target = self.patchify(imgs)
+        target = self.patchify(imgs, self.patch_embed.patch_size[0], self.in_c)
         if self.norm_pix_loss:
             mean = target.mean(dim=-1, keepdim=True)
             var = target.var(dim=-1, keepdim=True)
