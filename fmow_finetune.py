@@ -42,7 +42,7 @@ def get_args_parser():
 
     # Model parameters
     parser.add_argument('--indp_channel', action='store_true', help='Use indp channel model')
-    parser.add_argument('--model', default='vit_base_patch16', type=str, metavar='MODEL',
+    parser.add_argument('--model', default='vit_large_patch16', type=str, metavar='MODEL',
                         help='Name of model to train')
 
     parser.add_argument('--input_size', default=224, type=int,
