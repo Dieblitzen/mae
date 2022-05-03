@@ -1,0 +1,3 @@
+[submodule "ViTDet"]
+	path = ViTDet
+	url = git@github.com:samar-khanna/ViTDet.git
