@@ -195,7 +195,7 @@ def main(args):
     if global_rank == 0 and args.wandb is not None:
         wandb.login(key="68b7ffd0d1edfde176a0e9e543c2d7fab6b5f885")
         wandb.init(project=args.wandb, entity="mae-sentinel")
-        wandb.config = args.__dict__
+        wandb.config.update(args)
         wandb.watch(model)
 
     print(f"Start training for {args.epochs} epochs")
