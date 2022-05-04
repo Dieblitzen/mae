@@ -47,6 +47,8 @@ def get_args_parser():
 
     parser.add_argument('--input_size', default=224, type=int,
                         help='images input size')
+    parser.add_argument('--patch_size', default=16, type=int,
+                        help='images input size')
 
     parser.add_argument('--drop_path', type=float, default=0.1, metavar='PCT',
                         help='Drop path rate (default: 0.1)')
@@ -231,13 +233,13 @@ def main(args):
     # Define the model
     if args.indp_channel:
         model = models_vit_channels.__dict__[args.model](
-            img_size=args.input_size, in_chans=dataset_train.in_c, num_classes=args.nb_classes,
-            drop_path_rate=args.drop_path, global_pool=args.global_pool,
+            patch_size=args.patch_size, img_size=args.input_size, in_chans=dataset_train.in_c,
+            num_classes=args.nb_classes, drop_path_rate=args.drop_path, global_pool=args.global_pool,
         )
     else:
         model = models_vit.__dict__[args.model](
-            img_size=args.input_size, in_chans=dataset_train.in_c, num_classes=args.nb_classes,
-            drop_path_rate=args.drop_path, global_pool=args.global_pool,
+            patch_size=args.patch_size, img_size=args.input_size, in_chans=dataset_train.in_c,
+            num_classes=args.nb_classes, drop_path_rate=args.drop_path, global_pool=args.global_pool,
         )
 
     if args.finetune and not args.eval:

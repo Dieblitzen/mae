@@ -51,6 +51,8 @@ def get_args_parser():
 
     parser.add_argument('--input_size', default=224, type=int,
                         help='images input size')
+    parser.add_argument('--patch_size', default=16, type=int,
+                        help='images input size')
 
     parser.add_argument('--mask_ratio', default=0.75, type=float,
                         help='Masking ratio (percentage of removed patches).')
@@ -158,10 +160,12 @@ def main(args):
     
     # define the model
     if args.indp_channel:
-        model = models_mae_channels.__dict__[args.model](in_chans=dataset_train.in_c,
+        model = models_mae_channels.__dict__[args.model](patch_size=args.patch_size,
+                                                         in_chans=dataset_train.in_c,
                                                          norm_pix_loss=args.norm_pix_loss)
     else:
-        model = models_mae.__dict__[args.model](in_chans=dataset_train.in_c,
+        model = models_mae.__dict__[args.model](patch_size=args.patch_size,
+                                                in_chans=dataset_train.in_c,
                                                 norm_pix_loss=args.norm_pix_loss)
     model.to(device)
 
