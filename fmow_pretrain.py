@@ -162,12 +162,14 @@ def main(args):
     
     # define the model
     if args.indp_channel:
-        model = models_mae_channels.__dict__[args.model](patch_size=args.patch_size,
+        model = models_mae_channels.__dict__[args.model](img_size=args.input_size,
+                                                         patch_size=args.patch_size,
                                                          in_chans=dataset_train.in_c,
                                                          spatial_mask=args.spatial_mask,
                                                          norm_pix_loss=args.norm_pix_loss)
     else:
-        model = models_mae.__dict__[args.model](patch_size=args.patch_size,
+        model = models_mae.__dict__[args.model](img_size=args.input_size,
+                                                patch_size=args.patch_size,
                                                 in_chans=dataset_train.in_c,
                                                 norm_pix_loss=args.norm_pix_loss)
     model.to(device)
