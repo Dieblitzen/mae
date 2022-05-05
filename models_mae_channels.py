@@ -22,13 +22,14 @@ from util.pos_embed import get_2d_sincos_pos_embed, get_1d_sincos_pos_embed_from
 class MaskedAutoencoderChannelViT(nn.Module):
     """ Masked Autoencoder with VisionTransformer backbone
     """
-    def __init__(self, img_size=224, patch_size=16, in_chans=3,
+    def __init__(self, img_size=224, patch_size=16, in_chans=3, spatial_mask=False,
                  channel_embed=256, embed_dim=1024, depth=24, num_heads=16,
                  decoder_channel_embed=128, decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16,
                  mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False):
         super().__init__()
 
         self.in_c = in_chans
+        self.spatial_mask = spatial_mask  # Whether to mask all channels of same spatial location
 
         # --------------------------------------------------------------------------
         # MAE encoder specifics
@@ -196,7 +197,20 @@ class MaskedAutoencoderChannelViT(nn.Module):
         # add pos embed w/o cls token
         x = x + pos_channel  # (N, c, L, D)
 
-        x, mask, ids_restore = self.random_masking(x.view(b, -1, D), mask_ratio)
+        if self.spatial_mask:
+            # Mask spatial location across all channels (i.e. spatial location as either all/no channels)
+            x = x.permute(0, 2, 1, 3).reshape(b, L, -1)  # (N, L, C*D)
+            x, mask, ids_restore = self.random_masking(x, mask_ratio)  # (N, 0.25*L, C*D)
+            x = x.view(b, x.shape[1], c, D).permute(0, 2, 1, 3).reshape(b, -1, D)  # (N, 0.25*C*L, D)
+            mask = mask.repeat(1, c)  # (N, C*L)
+            ids_restore = ids_restore.repeat(1, c)  # (N, C*L)
+
+            # Have to shift ids_restore for each channel by offset of L
+            offset = torch.arange(0, c*L, step=L, device=ids_restore.device).repeat_interleave(L)  # (C*L)
+            ids_restore += offset.view(1, -1)
+        else:
+            # Independently mask each channel (i.e. spatial location has subset of channels visible)
+            x, mask, ids_restore = self.random_masking(x.view(b, -1, D), mask_ratio)  # (N, 0.25*C*L, D)
 
         # x_rgb = x[:, :3, :, :].view(b, -1, D)  # (N, 3*L, D)
         # x_sent = x[:, 3:, :, :].view(b, -1, D)  # (N, 13*L, D)

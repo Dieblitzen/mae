@@ -56,6 +56,8 @@ def get_args_parser():
 
     parser.add_argument('--mask_ratio', default=0.75, type=float,
                         help='Masking ratio (percentage of removed patches).')
+    parser.add_argument('--spatial_mask', action='store_true', default=False,
+                        help='Whether to mask all channels of a spatial location. Only for indp c model')
 
     parser.add_argument('--norm_pix_loss', action='store_true',
                         help='Use (per-patch) normalized pixels as targets for computing loss')
@@ -162,6 +164,7 @@ def main(args):
     if args.indp_channel:
         model = models_mae_channels.__dict__[args.model](patch_size=args.patch_size,
                                                          in_chans=dataset_train.in_c,
+                                                         spatial_mask=args.spatial_mask,
                                                          norm_pix_loss=args.norm_pix_loss)
     else:
         model = models_mae.__dict__[args.model](patch_size=args.patch_size,
