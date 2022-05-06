@@ -240,7 +240,7 @@ class MaskedAutoencoderChannelViT(nn.Module):
 
     def forward_decoder(self, x, ids_restore):
         # embed tokens
-        x = self.decoder_embed(x)  # (N, c*0.25*L, D)
+        x = self.decoder_embed(x)  # (N, 1 + c*0.25*L, D)
 
         # append mask tokens to sequence
         if self.spatial_mask:
