@@ -253,7 +253,7 @@ class MaskedAutoencoderChannelViT(nn.Module):
 
             mask_tokens = self.mask_token.repeat(N, L - ml, c)
             x_ = torch.cat((x_, mask_tokens), dim=1)  # no cls token
-            x_ = torch.gather(x_, dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x_.shape[2]))  # (N, L, c*D)
+            x_ = torch.gather(x_, dim=1, index=ids_restore.unsqueeze(-1).expand(1, 1, x_.shape[2]))  # (N, L, c*D)
             x_ = x_.view(N, L, c, D).permute(0, 2, 1, 3).reshape(N, -1, D)  # (N, c*L, D)
             x = torch.cat((x[:, :1, :], x_), dim=1)  # append cls token  (N, 1 + c*L, D)
         else:
