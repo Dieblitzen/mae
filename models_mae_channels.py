@@ -203,11 +203,12 @@ class MaskedAutoencoderChannelViT(nn.Module):
             x, mask, ids_restore = self.random_masking(x, mask_ratio)  # (N, 0.25*L, C*D)
             x = x.view(b, x.shape[1], c, D).permute(0, 2, 1, 3).reshape(b, -1, D)  # (N, 0.25*C*L, D)
             mask = mask.repeat(1, c)  # (N, C*L)
-            ids_restore = ids_restore.repeat(1, c)  # (N, C*L)
 
-            # Have to shift ids_restore for each channel by offset of L
-            offset = torch.arange(0, c*L, step=L, device=ids_restore.device).repeat_interleave(L)  # (C*L)
-            ids_restore += offset.view(1, -1)
+            # ids_restore = ids_restore.repeat(1, c)  # (N, C*L)
+            #
+            # # Have to shift ids_restore for each channel by offset of L
+            # offset = torch.arange(0, c*L, step=L, device=ids_restore.device).repeat_interleave(L)  # (C*L)
+            # ids_restore += offset.view(1, -1)
         else:
             # Independently mask each channel (i.e. spatial location has subset of channels visible)
             x, mask, ids_restore = self.random_masking(x.view(b, -1, D), mask_ratio)  # (N, 0.25*C*L, D)
@@ -239,13 +240,27 @@ class MaskedAutoencoderChannelViT(nn.Module):
 
     def forward_decoder(self, x, ids_restore):
         # embed tokens
-        x = self.decoder_embed(x)  # (N, c*L, D)
+        x = self.decoder_embed(x)  # (N, c*0.25*L, D)
 
         # append mask tokens to sequence
-        mask_tokens = self.mask_token.repeat(x.shape[0], ids_restore.shape[1] + 1 - x.shape[1], 1)
-        x_ = torch.cat([x[:, 1:, :], mask_tokens], dim=1)  # no cls token
-        x_ = torch.gather(x_, dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x.shape[2]))  # unshuffle
-        x = torch.cat([x[:, :1, :], x_], dim=1)  # append cls token
+        if self.spatial_mask:
+            c = self.in_c
+            N, L = ids_restore.shape
+
+            x_ = x[:, 1:, :].view(N, c, -1, x.shape[2]).permute(0, 2, 1, 3)  # (N, 0.25*L, c, D)
+            _, ml, _, D = x_.shape
+            x_ = x_.reshape(N, ml, c*D)  # (N, 0.25*L, c*D)
+
+            mask_tokens = self.mask_token.repeat(N, L - ml, c)
+            x_ = torch.cat((x_, mask_tokens), dim=1)  # no cls token
+            x_ = torch.gather(x_, dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x_.shape[2]))  # (N, L, c*D)
+            x_ = x_.view(N, L, c, D).permute(0, 2, 1, 3).reshape(N, -1, D)  # (N, c*L, D)
+            x = torch.cat((x[:, :1, :], x_), dim=1)  # append cls token  (N, 1 + c*L, D)
+        else:
+            mask_tokens = self.mask_token.repeat(x.shape[0], ids_restore.shape[1] + 1 - x.shape[1], 1)
+            x_ = torch.cat([x[:, 1:, :], mask_tokens], dim=1)  # no cls token
+            x_ = torch.gather(x_, dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x.shape[2]))  # unshuffle
+            x = torch.cat([x[:, :1, :], x_], dim=1)  # append cls token  (N, 1 + c*L, D)
 
         # add pos and channel embed
         channel_embed = self.decoder_channel_embed[:, :-1, :].unsqueeze(2)  # (1, c, 1, cD)
