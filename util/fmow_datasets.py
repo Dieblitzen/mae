@@ -452,13 +452,14 @@ def build_transform(is_train, input_size, mean, std):
     # mean = IMAGENET_DEFAULT_MEAN
     # std = IMAGENET_DEFAULT_STD
     # train transform
+    interpol_mode = transforms.InterpolationMode.BICUBIC
 
     t = []
     if is_train:
         t.append(transforms.ToTensor())
         t.append(transforms.Normalize(mean, std))
         t.append(
-            transforms.RandomResizedCrop(input_size, scale=(0.2, 1.0), interpolation=3),  # 3 is bicubic
+            transforms.RandomResizedCrop(input_size, scale=(0.2, 1.0), interpolation=interpol_mode),  # 3 is bicubic
         )
         t.append(transforms.RandomHorizontalFlip())
         return transforms.Compose(t)
@@ -473,7 +474,7 @@ def build_transform(is_train, input_size, mean, std):
     t.append(transforms.ToTensor())
     t.append(transforms.Normalize(mean, std))
     t.append(
-        transforms.Resize(size, interpolation=Image.BICUBIC),  # to maintain same ratio w.r.t. 224 images
+        transforms.Resize(size, interpolation=interpol_mode),  # to maintain same ratio w.r.t. 224 images
     )
     t.append(transforms.CenterCrop(input_size))
 
