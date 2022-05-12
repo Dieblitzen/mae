@@ -121,7 +121,7 @@ def get_args_parser():
                         help='Test .csv path')
     parser.add_argument('--dataset_type', default='rgb',
                         help='Whether to use fmow rgb, sentinel, or other dataset.')
-    parser.add_argument('--masked_bands', default=None, nargs='+',
+    parser.add_argument('--masked_bands', default=None, nargs='+', type=int,
                         help='Sequence of band indices to mask (with mean val) in sentinel dataset')
 
     parser.add_argument('--nb_classes', default=62, type=int,
