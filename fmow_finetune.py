@@ -121,6 +121,8 @@ def get_args_parser():
                         help='Test .csv path')
     parser.add_argument('--dataset_type', default='rgb',
                         help='Whether to use fmow rgb, sentinel, or other dataset.')
+    parser.add_argument('--masked_bands', default=None, nargs='+',
+                        help='Sequence of band indices to mask (with mean val) in sentinel dataset')
 
     parser.add_argument('--nb_classes', default=62, type=int,
                         help='number of the classification types')
@@ -324,7 +326,8 @@ def main(args):
 
     if args.eval:
         test_stats = evaluate(data_loader_val, model, device)
-        print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
+        print(f"Evaluation on {len(dataset_val)} test images- acc1: {test_stats['acc1']:.2f}%, "
+              f"acc5: {test_stats['acc5']:.2f}%")
         exit(0)
 
     print(f"Start training for {args.epochs} epochs")

@@ -254,7 +254,8 @@ class SentinelIndividualImageDataset(SatelliteDataset):
                  years=[*range(2000, 2021)],
                  categories=None,
                  label_type='value',
-                 resize=64):
+                 resize=64,
+                 masked_bands=None):
         """ Initialize the dataset.
 
         Args:
@@ -269,6 +270,7 @@ class SentinelIndividualImageDataset(SatelliteDataset):
                 on tensor images.
             label_type (string): 'values' for single regression label, 'one-hot' for one hot labels
             resize: Size to load images as
+            masked_bands: List of indices corresponding to which bands to mask out
         """
         super().__init__(in_c=13)
         self.df = pd.read_csv(csv_path) \
@@ -296,6 +298,7 @@ class SentinelIndividualImageDataset(SatelliteDataset):
         self.label_type = label_type
 
         self.resize = resize
+        self.masked_bands = masked_bands
 
     def __len__(self):
         return len(self.df)
@@ -333,6 +336,8 @@ class SentinelIndividualImageDataset(SatelliteDataset):
 
         # images = [torch.FloatTensor(rasterio.open(img_path).read()) for img_path in image_paths]
         images = self.open_image(selection['image_path'])
+        if self.masked_bands is not None:
+            images[:, :, self.masked_bands] = np.array(self.mean)[self.masked_bands]
 
         labels = self.categories.index(selection['category'])
 
@@ -427,7 +432,7 @@ def build_fmow_dataset(is_train, args) -> SatelliteDataset:
         mean = SentinelIndividualImageDataset.mean
         std = SentinelIndividualImageDataset.std
         transform = build_transform(is_train, args.input_size, mean, std)
-        dataset = SentinelIndividualImageDataset(csv_path, transform)
+        dataset = SentinelIndividualImageDataset(csv_path, transform, masked_bands=args.masked_bands)
     elif args.dataset_type == 'rgb_temporal_stacked':
         mean = FMoWTemporalStacked.mean
         std = FMoWTemporalStacked.std
