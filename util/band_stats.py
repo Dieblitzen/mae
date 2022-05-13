@@ -68,8 +68,34 @@ def pixel_counts(dataset, sample=None):
     for i in seq:
         x, _ = dataset[i]  # (c, h, w)
 
-        for i, xc in enumerate(x):
-            channel_counters[i].update(xc.reshape(-1))
+        for j, xc in enumerate(x):
+            channel_counters[j].update(xc.reshape(-1))
+    return channel_counters
+
+
+def get_pixel_count_per_channel(i, dataset):
+    x, _ = dataset[i]  # (c, h, w)
+    channel_counters = defaultdict(Counter)
+    for j, xc in enumerate(x):
+        channel_counters[j].update(xc.reshape(-1))
+    return channel_counters
+
+
+def pixel_counts_parallel(dataset, num_workers, sample=None):
+    channel_counters = defaultdict(Counter)
+
+    seq = sample if sample is not None else range(len(dataset))
+    with ThreadPoolExecutor(max_workers=num_workers) as ex:
+        future_to_i = {ex.submit(get_pixel_count_per_channel, i, dataset): i for i in seq}
+        for future in tqdm(as_completed(future_to_i)):
+            try:
+                img_channel_counters = future.result()
+            except Exception as e:
+                print(f"Error on img {future_to_i[future]}")
+                raise e
+            else:
+                for c, counter in img_channel_counters.items():
+                    channel_counters[c].update(counter)
     return channel_counters
 
 
@@ -103,7 +129,7 @@ if __name__ == "__main__":
         print(f"StdDev: {std.tolist()}")
     elif args.stat_type == 'pixel_count':
         sample = np.random.choice(len(dataset), size=2000, replace=False)
-        channel_pixel_counts = pixel_counts(dataset, sample=sample)
+        channel_pixel_counts = pixel_counts_parallel(dataset, args.num_workers, sample=sample)
         channel_pixel_counts = {c: dict(counter) for c, counter in channel_pixel_counts.items()}
         with open('pixel_counts.pkl', 'wb') as f:
             pickle.dump(channel_pixel_counts, f)
