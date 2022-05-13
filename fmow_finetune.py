@@ -123,6 +123,8 @@ def get_args_parser():
                         help='Whether to use fmow rgb, sentinel, or other dataset.')
     parser.add_argument('--masked_bands', default=None, nargs='+', type=int,
                         help='Sequence of band indices to mask (with mean val) in sentinel dataset')
+    parser.add_argument('--dropped_bands', type=int, nargs='+', default=None,
+                        help="Which bands (0 indexed) to drop from sentinel data.")
 
     parser.add_argument('--nb_classes', default=62, type=int,
                         help='number of the classification types')

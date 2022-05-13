@@ -84,6 +84,8 @@ def get_args_parser():
                         help='Test .csv path')
     parser.add_argument('--dataset_type', default='rgb',
                         help='Whether to use fmow rgb, sentinel, or other dataset.')
+    parser.add_argument('--dropped_bands', type=int, nargs='+', default=None,
+                        help="Which bands (0 indexed) to drop from sentinel data.")
 
     parser.add_argument('--output_dir', default='./output_dir',
                         help='path where to save, empty for no saving')

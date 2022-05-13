@@ -255,7 +255,8 @@ class SentinelIndividualImageDataset(SatelliteDataset):
                  categories=None,
                  label_type='value',
                  resize=64,
-                 masked_bands=None):
+                 masked_bands=None,
+                 dropped_bands=None):
         """ Initialize the dataset.
 
         Args:
@@ -298,7 +299,11 @@ class SentinelIndividualImageDataset(SatelliteDataset):
         self.label_type = label_type
 
         self.resize = resize
+
         self.masked_bands = masked_bands
+        self.dropped_bands = dropped_bands
+        if self.dropped_bands is not None:
+            self.in_c = self.in_c - len(dropped_bands)
 
     def __len__(self):
         return len(self.df)
@@ -335,13 +340,16 @@ class SentinelIndividualImageDataset(SatelliteDataset):
         selection = self.df.iloc[idx]
 
         # images = [torch.FloatTensor(rasterio.open(img_path).read()) for img_path in image_paths]
-        images = self.open_image(selection['image_path'])
+        images = self.open_image(selection['image_path'])  # (h, w, c)
         if self.masked_bands is not None:
             images[:, :, self.masked_bands] = np.array(self.mean)[self.masked_bands]
 
         labels = self.categories.index(selection['category'])
 
-        img_as_tensor = self.transform(images)
+        img_as_tensor = self.transform(images)  # (c, h, w)
+        if self.dropped_bands is not None:
+            keep_idxs = [i for i in range(img_as_tensor.shape[0]) if i not in self.dropped_bands]
+            img_as_tensor = img_as_tensor[keep_idxs, :, :]
 
         sample = {
             'images': images,
@@ -432,7 +440,8 @@ def build_fmow_dataset(is_train, args) -> SatelliteDataset:
         mean = SentinelIndividualImageDataset.mean
         std = SentinelIndividualImageDataset.std
         transform = build_transform(is_train, args.input_size, mean, std)
-        dataset = SentinelIndividualImageDataset(csv_path, transform, masked_bands=args.masked_bands)
+        dataset = SentinelIndividualImageDataset(csv_path, transform, masked_bands=args.masked_bands,
+                                                 dropped_bands=args.dropped_bands)
     elif args.dataset_type == 'rgb_temporal_stacked':
         mean = FMoWTemporalStacked.mean
         std = FMoWTemporalStacked.std
