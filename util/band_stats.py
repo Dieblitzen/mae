@@ -1,10 +1,12 @@
-import concurrent.futures
 import math
 import torch
 import torchvision
 import argparse
+import pickle
+import numpy as np
 from tqdm import tqdm
-from concurrent.futures import ThreadPoolExecutor
+from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from fmow_datasets import CustomDatasetFromImages, SentinelIndividualImageDataset
 
@@ -36,14 +38,14 @@ def get_sum_count(i, dataset):
     return img_sum, img_sum_sq, img_count
 
 
-def get_mean_std_parrallel(dataset, num_workers):
+def get_mean_std_parallel(dataset, num_workers):
     mean = torch.zeros(dataset[0][0].shape[0]).log()  # (c,)
     std = torch.zeros(dataset[0][0].shape[0]).log()  # (c,)
     count = 0
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as ex:
+    with ThreadPoolExecutor(max_workers=num_workers) as ex:
         future_to_i = {ex.submit(get_sum_count, i, dataset): i for i in range(len(dataset))}
-        for future in tqdm(concurrent.futures.as_completed(future_to_i)):
+        for future in tqdm(as_completed(future_to_i)):
             try:
                 img_sum, img_sum_sq, img_count = future.result()
             except Exception as e:
@@ -60,12 +62,25 @@ def get_mean_std_parrallel(dataset, num_workers):
     return mean, std
 
 
+def pixel_counts(dataset, sample=None):
+    seq = tqdm(sample) if sample is not None else tqdm(range(len(dataset)))
+    channel_counters = defaultdict(Counter)
+    for i in seq:
+        x, _ = dataset[i]  # (c, h, w)
+
+        for i, xc in enumerate(x):
+            channel_counters[i].update(xc.reshape(-1))
+    return channel_counters
+
+
 def passed_args():
     parser = argparse.ArgumentParser(description="Get band stats")
     parser.add_argument('--dataset_type', type=str, default='rgb',
                         help='Sentinel or rgb')
     parser.add_argument('--dataset', type=str, required=True)
     parser.add_argument('--num_workers', type=int, default=16)
+    parser.add_argument('--stat_type', type=str, default='mean_std',
+                        choices=['mean_std', 'pixel_count'])
     return parser.parse_args()
 
 
@@ -80,7 +95,15 @@ if __name__ == "__main__":
 
     transform = torchvision.transforms.ToTensor()
     dataset = dataset_type(args.dataset, transform)
-    # mean, std = get_mean_std(dataset)
-    mean, std = get_mean_std_parrallel(dataset, args.num_workers)
-    print(f"Mean: {mean.tolist()}")
-    print(f"StdDev: {std.tolist()}")
+
+    if args.stat_type == 'mean_std':
+        # mean, std = get_mean_std(dataset)
+        mean, std = get_mean_std_parallel(dataset, args.num_workers)
+        print(f"Mean: {mean.tolist()}")
+        print(f"StdDev: {std.tolist()}")
+    elif args.stat_type == 'pixel_count':
+        sample = np.random.choice(len(dataset), size=2000, replace=False)
+        channel_pixel_counts = pixel_counts(dataset, sample=sample)
+        channel_pixel_counts = {c: dict(counter) for c, counter in channel_pixel_counts.items()}
+        with open('pixel_counts.pkl', 'wb') as f:
+            pickle.dump(channel_pixel_counts, f)
