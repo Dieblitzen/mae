@@ -69,7 +69,7 @@ def pixel_counts(dataset, sample=None):
         x, _ = dataset[i]  # (c, h, w)
 
         for j, xc in enumerate(x):
-            channel_counters[j].update(xc.view(-1).tolist())
+            channel_counters[j].update(xc.view(-1).type(int).tolist())
     return channel_counters
 
 
@@ -77,7 +77,7 @@ def get_pixel_count_per_channel(i, dataset):
     x, _ = dataset[i]  # (c, h, w)
     channel_counters = defaultdict(Counter)
     for j, xc in enumerate(x):
-        channel_counters[j].update(xc.view(-1).tolist())
+        channel_counters[j].update(xc.view(-1).type(int).tolist())
     return channel_counters
 
 
