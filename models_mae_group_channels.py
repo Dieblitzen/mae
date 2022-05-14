@@ -318,7 +318,7 @@ class MaskedAutoencoderGroupChannelViT(nn.Module):
         total_loss = 0.
         for i, group in enumerate(self.channel_groups):
             group_loss = loss[:, group, :].mean(dim=1)  # (N, L)
-            total_loss += (group_loss * mask[:, i])/mask[:, i].sum()  # mean loss on removed patches
+            total_loss += (group_loss * mask[:, i]).sum()/mask[:, i].sum()  # mean loss on removed patches
 
         return total_loss
 
