@@ -189,7 +189,7 @@ class MaskedAutoencoderGroupChannelViT(nn.Module):
         b, c, h, w = x.shape
 
         x_c_embed = []
-        for i, group in self.channel_groups:
+        for i, group in enumerate(self.channel_groups):
             x_c = x[:, group, :, :]
             x_c_embed.append(self.patch_embed[i](x_c))  # (N, L, D)
 
@@ -283,7 +283,7 @@ class MaskedAutoencoderGroupChannelViT(nn.Module):
 
         # predictor projection
         x_c_patch = []
-        for i, group in self.channel_groups:
+        for i, group in enumerate(self.channel_groups):
             x_c = x[:, i]  # (N, L, D)
             x_c_patch.append(self.decoder_pred[i](x_c))
 
