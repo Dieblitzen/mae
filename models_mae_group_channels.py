@@ -31,6 +31,7 @@ class MaskedAutoencoderGroupChannelViT(nn.Module):
         super().__init__()
 
         self.in_c = in_chans
+        self.patch_size = patch_size
         self.channel_groups = channel_groups
         self.spatial_mask = spatial_mask  # Whether to mask all channels of same spatial location
         num_groups = len(channel_groups)
@@ -214,10 +215,11 @@ class MaskedAutoencoderGroupChannelViT(nn.Module):
             x, mask, ids_restore = self.random_masking(x, mask_ratio)  # (N, 0.25*L, G*D)
             x = x.view(b, x.shape[1], G, D).permute(0, 2, 1, 3).reshape(b, -1, D)  # (N, 0.25*G*L, D)
             mask = mask.repeat(1, G)  # (N, G*L)
-
+            mask = mask.view(b, G, L)
         else:
             # Independently mask each channel (i.e. spatial location has subset of channels visible)
             x, mask, ids_restore = self.random_masking(x.view(b, -1, D), mask_ratio)  # (N, 0.25*G*L, D)
+            mask = mask.view(b, G, L)
 
         # append cls token
         cls_tokens = self.cls_token.expand(x.shape[0], -1, -1)
@@ -285,9 +287,12 @@ class MaskedAutoencoderGroupChannelViT(nn.Module):
         x_c_patch = []
         for i, group in enumerate(self.channel_groups):
             x_c = x[:, i]  # (N, L, D)
-            x_c_patch.append(self.decoder_pred[i](x_c))
+            dec = self.decoder_pred[i](x_c)  # (N, L, g_c * p^2)
+            dec = dec.view(N, x_c.shape[1], -1, int(self.patch_size**2))  # (N, L, g_c, p^2)
+            dec = torch.einsum('nlcp->nclp', dec)  # (N, g_c, L, p^2)
+            x_c_patch.append(dec)
 
-        x = torch.cat(x_c_patch, dim=-1)  # (N, L, c * p**2)
+        x = torch.cat(x_c_patch, dim=1)  # (N, c, L, p**2)
         return x
 
     def forward_loss(self, imgs, pred, mask):
@@ -297,16 +302,25 @@ class MaskedAutoencoderGroupChannelViT(nn.Module):
         mask: [N, L], 0 is keep, 1 is remove,
         """
         target = self.patchify(imgs, self.patch_embed[0].patch_size[0], self.in_c)  # (N, L, C*P*P)
+
+        N, L, _ = target.shape
+        target = target.view(N, L, self.in_c, -1)  # (N, L, C, p^2)
+        target = torch.einsum('nlcp->nclp', target)  # (N, C, L, p^2)
+
         if self.norm_pix_loss:
             mean = target.mean(dim=-1, keepdim=True)
             var = target.var(dim=-1, keepdim=True)
             target = (target - mean) / (var + 1.e-6) ** .5
 
         loss = (pred - target) ** 2
-        loss = loss.mean(dim=-1)  # [N, L], mean loss per patch
+        loss = loss.mean(dim=-1)  # [N, C, L], mean loss per patch
 
-        loss = (loss * mask).sum() / mask.sum()  # mean loss on removed patches
-        return loss
+        total_loss = 0.
+        for i, group in enumerate(self.channel_groups):
+            group_loss = loss[:, group, :].mean(dim=1)  # (N, L)
+            total_loss += (group_loss * mask[:, i])/mask[:, i].sum()  # mean loss on removed patches
+
+        return total_loss
 
     def forward(self, imgs, mask_ratio=0.75):
         latent, mask, ids_restore = self.forward_encoder(imgs, mask_ratio)
