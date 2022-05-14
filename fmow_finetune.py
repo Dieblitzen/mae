@@ -28,6 +28,7 @@ from util.misc import NativeScalerWithGradNormCount as NativeScaler
 
 import models_vit
 import models_vit_channels
+import models_vit_group_channels
 
 from engine_finetune import train_one_epoch, evaluate
 
@@ -41,7 +42,8 @@ def get_args_parser():
                         help='Accumulate gradient iterations (for increasing the effective batch size under memory constraints)')
 
     # Model parameters
-    parser.add_argument('--indp_channel', action='store_true', help='Use indp channel model')
+    parser.add_argument('--model_type', default=None, choices=['indp_c', 'group_c'],
+                        help='Use channel model')
     parser.add_argument('--model', default='vit_large_patch16', type=str, metavar='MODEL',
                         help='Name of model to train')
 
@@ -125,6 +127,8 @@ def get_args_parser():
                         help='Sequence of band indices to mask (with mean val) in sentinel dataset')
     parser.add_argument('--dropped_bands', type=int, nargs='+', default=None,
                         help="Which bands (0 indexed) to drop from sentinel data.")
+    parser.add_argument('--grouped_bands', type=int, nargs='+', action='append',
+                        default=[[0, 1, 2, 6], [3, 4, 5, 7], [8, 9]], help="Bands to group for GroupC vit")
 
     parser.add_argument('--nb_classes', default=62, type=int,
                         help='number of the classification types')
@@ -235,9 +239,15 @@ def main(args):
             label_smoothing=args.smoothing, num_classes=args.nb_classes)
 
     # Define the model
-    if args.indp_channel:
+    if args.model_type == 'indp_c':
         model = models_vit_channels.__dict__[args.model](
             patch_size=args.patch_size, img_size=args.input_size, in_chans=dataset_train.in_c,
+            num_classes=args.nb_classes, drop_path_rate=args.drop_path, global_pool=args.global_pool,
+        )
+    elif args.model_type == 'group_c':
+        model = models_vit_group_channels.__dict__[args.model](
+            patch_size=args.patch_size, img_size=args.input_size, in_chans=dataset_train.in_c,
+            channel_groups=args.grouped_bands,
             num_classes=args.nb_classes, drop_path_rate=args.drop_path, global_pool=args.global_pool,
         )
     else:
