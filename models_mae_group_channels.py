@@ -315,12 +315,13 @@ class MaskedAutoencoderGroupChannelViT(nn.Module):
         loss = (pred - target) ** 2
         loss = loss.mean(dim=-1)  # [N, C, L], mean loss per patch
 
-        total_loss = 0.
+        total_loss, num_removed = 0., 0.
         for i, group in enumerate(self.channel_groups):
             group_loss = loss[:, group, :].mean(dim=1)  # (N, L)
-            total_loss += (group_loss * mask[:, i]).sum()/mask[:, i].sum()  # mean loss on removed patches
+            total_loss += (group_loss * mask[:, i]).sum()
+            num_removed += mask[:, i].sum()  # mean loss on removed patches
 
-        return total_loss
+        return total_loss/num_removed
 
     def forward(self, imgs, mask_ratio=0.75):
         latent, mask, ids_restore = self.forward_encoder(imgs, mask_ratio)
