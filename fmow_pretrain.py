@@ -32,6 +32,7 @@ from util.misc import NativeScalerWithGradNormCount as NativeScaler
 
 import models_mae
 import models_mae_channels
+import models_mae_group_channels
 
 from engine_pretrain import train_one_epoch
 
@@ -45,7 +46,8 @@ def get_args_parser():
                         help='Accumulate gradient iterations (for increasing the effective batch size under memory constraints)')
 
     # Model parameters
-    parser.add_argument('--indp_channel', action='store_true', help='Use indp channel model')
+    parser.add_argument('--model_type', default=None, choices=['indp_c', 'group_c'],
+                        help='Use channel model')
     parser.add_argument('--model', default='mae_vit_large_patch16', type=str, metavar='MODEL',
                         help='Name of model to train')
 
@@ -88,6 +90,8 @@ def get_args_parser():
                         help='Sequence of band indices to mask (with mean val) in sentinel dataset')
     parser.add_argument('--dropped_bands', type=int, nargs='+', default=None,
                         help="Which bands (0 indexed) to drop from sentinel data.")
+    parser.add_argument('--grouped_bands', type=int, nargs='+', action='append',
+                        default=[[0, 1, 2, 6], [3, 4, 5, 7], [8, 9]], help="Bands to group for GroupC mae")
 
     parser.add_argument('--output_dir', default='./output_dir',
                         help='path where to save, empty for no saving')
@@ -165,12 +169,19 @@ def main(args):
     )
     
     # define the model
-    if args.indp_channel:
+    if args.model_type == 'indp_c':
         model = models_mae_channels.__dict__[args.model](img_size=args.input_size,
                                                          patch_size=args.patch_size,
                                                          in_chans=dataset_train.in_c,
                                                          spatial_mask=args.spatial_mask,
                                                          norm_pix_loss=args.norm_pix_loss)
+    elif args.model_type == 'group_c':
+        model = models_mae_group_channels.__dict__[args.model](img_size=args.input_size,
+                                                               patch_size=args.patch_size,
+                                                               in_chans=dataset_train.in_c,
+                                                               channel_groups=args.grouped_bands,
+                                                               spatial_mask=args.spatial_mask,
+                                                               norm_pix_loss=args.norm_pix_loss)
     else:
         model = models_mae.__dict__[args.model](img_size=args.input_size,
                                                 patch_size=args.patch_size,
