@@ -253,7 +253,7 @@ def main(args):
         )
     elif args.model_type == 'resnet' or args.model_type == 'resnet_pre':
         pre_trained = args.model_type == 'resnet_pre'
-        model = models_resnet.__dict__[args.model](in_c=dataset_train.in_c, pre_trained=pre_trained)
+        model = models_resnet.__dict__[args.model](in_c=dataset_train.in_c, pretrained=pre_trained)
     else:
         model = models_vit.__dict__[args.model](
             patch_size=args.patch_size, img_size=args.input_size, in_chans=dataset_train.in_c,
