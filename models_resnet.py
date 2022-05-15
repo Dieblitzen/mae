@@ -6,7 +6,7 @@ def replace_first_conv(model, in_c):
     old_conv = model.conv1
     model.conv1 = nn.Conv2d(in_c, old_conv.out_channels, kernel_size=old_conv.kernel_size,
                             stride=old_conv.stride, padding=old_conv.padding, bias=False)
-    model.conv1.weight[:, :3, :, :] = old_conv.weight
+    model.conv1.weight.data[:, :3, :, :] = old_conv.weight.data
     return model
 
 
