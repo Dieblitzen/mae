@@ -322,7 +322,7 @@ def main(args):
         model_without_ddp = model.module
 
     # build optimizer with layer-wise lr decay (lrd)
-    if args.model_type.startswith('resnet'):
+    if args.model_type is not None and args.model_type.startswith('resnet'):
         param_groups = model_without_ddp.parameters()
     else:
         param_groups = lrd.param_groups_lrd(model_without_ddp, args.weight_decay,
