@@ -272,7 +272,7 @@ def main(args):
             model_patch_embed_weight = state_dict['patch_embed.proj.weight']
             if ckpt_patch_embed_weight.shape[1] != model_patch_embed_weight.shape[1]:
                 print('Using 3 channels of ckpt patch_embed')
-                model.patch_embed.weight.data[:, :3, :, :] = ckpt_patch_embed_weight.data[:, :3, :, :]
+                model.patch_embed.proj.weight.data[:, :3, :, :] = ckpt_patch_embed_weight.data[:, :3, :, :]
 
         # TODO: Do something smarter?
         for k in ['pos_embed', 'patch_embed.proj.weight', 'patch_embed.proj.bias', 'head.weight', 'head.bias']:
