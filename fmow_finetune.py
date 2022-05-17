@@ -266,6 +266,14 @@ def main(args):
         print("Load pre-trained checkpoint from: %s" % args.finetune)
         checkpoint_model = checkpoint['model']
         state_dict = model.state_dict()
+
+        if 'patch_embed.proj.weight' in checkpoint_model and 'patch_embed.proj.weight' in state_dict:
+            ckpt_patch_embed_weight = checkpoint_model['patch_embed.proj.weight']
+            model_patch_embed_weight = state_dict['patch_embed.proj.weight']
+            if ckpt_patch_embed_weight.shape[1] != model_patch_embed_weight.shape[1]:
+                print('Using 3 channels of ckpt patch_embed')
+                model.patch_embed.weight.data[:, :3, :, :] = ckpt_patch_embed_weight.weight.data
+
         # TODO: Do something smarter?
         for k in ['pos_embed', 'patch_embed.proj.weight', 'patch_embed.proj.bias', 'head.weight', 'head.bias']:
             if k in checkpoint_model and checkpoint_model[k].shape != state_dict[k].shape:
