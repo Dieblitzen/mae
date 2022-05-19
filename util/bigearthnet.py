@@ -58,6 +58,36 @@ BAND_STATS = {
         'B12': 818.86747235
     }
 }
+# BAND_STATS = {
+#     'mean': {
+#         'B01': 1370.76769064,
+#         'B02': 1184.9430203,
+#         'B03': 1120.21682446,
+#         'B04': 1136.23569706,
+#         'B05': 1263.68368468,
+#         'B06': 1645.46290469,
+#         'B07': 1846.46795189,
+#         'B08': 1762.94553375,
+#         'B8A': 1972.46036911,
+#         'B09': 582.0605464,
+#         'B11': 1732.42694882,
+#         'B12': 1247.32729131
+#     },
+#     'std': {
+#         'B01': 633.81258967,
+#         'B02': 650.41639287,
+#         'B03': 712.87945694,
+#         'B04': 965.88746967,
+#         'B05': 948.89827633,
+#         'B06': 1108.01480586,
+#         'B07': 1258.45393088,
+#         'B08': 1233.45589904,
+#         'B8A': 1364.13789355,
+#         'B09': 472.3292881,
+#         'B11': 1310.19066363,
+#         'B12': 1087.86747235
+#     }
+# }
 
 LABELS = [
     'Agro-forestry areas', 'Airports',
@@ -127,10 +157,13 @@ GROUP_LABELS = {
 
 
 def normalize(img, mean, std):
-    min_value = mean - 2 * std
-    max_value = mean + 2 * std
-    img = (img - min_value) / (max_value - min_value) * 255.0
-    img = np.clip(img, 0, 255).astype(np.uint8)
+    # min_value = mean - 2 * std
+    # max_value = mean + 2 * std
+    # img = (img - min_value) / (max_value - min_value) * 255.0
+    # img = np.clip(img, 0, 255).astype(np.uint8)
+    # return img
+    img = img - mean
+    img = img / std
     return img
 
 
@@ -196,7 +229,7 @@ class Bigearthnet(Dataset):
 
         channels = []
         for b in self.bands:
-            ch = rasterio.open(path / f'{patch_id}_{b}.tif').read(1)
+            ch = rasterio.open(path / f'{patch_id}_{b}.tif').read(1).astype(np.float32)
             ch = normalize(ch, mean=BAND_STATS['mean'][b], std=BAND_STATS['std'][b])
             channels.append(ch)
         # img = np.dstack(channels)
@@ -212,6 +245,7 @@ class Bigearthnet(Dataset):
         if self.transform is not None:
             img = [self.transform(ch) for ch in channels]
             # img = self.transform(img)
+            # print(img)
             img = torch.cat(img, dim=0)
         if self.target_transform is not None:
             target = self.target_transform(target)

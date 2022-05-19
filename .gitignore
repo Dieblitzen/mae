@@ -4,3 +4,6 @@ bigearthnet_finetune/
 test/
 util/__pycache__/
 wandb/
+bigearthnet_finetune2/
+bigearthnet_finetune_contbige/
+bigearthnet_scratch/
