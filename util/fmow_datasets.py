@@ -249,7 +249,7 @@ class SentinelIndividualImageDataset(SatelliteDataset):
            1364.38688993,  472.37967789,   14.3114637 , 1310.36996126, 1087.6020813]
 
     def __init__(self,
-                 csv_path,
+                 split_path,
                  transform,
                  years=[*range(2000, 2021)],
                  categories=None,

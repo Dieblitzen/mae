@@ -1,0 +1,6 @@
+nohup python -m torch.distributed.launch --nproc_per_node=8 --master_port=29501  fmow_finetune.py   --batch_size 7 \
+--accum_iter 8 --epochs 50 --blr 1e-3 --layer_decay 0.75 --weight_decay 0.05 --drop_path 0.2 --reprob 0.25 \
+--num_workers 8 --input_size 96 --patch_size 8 --save_every 1  \
+--finetune /atlas/u/yzcong/samar/mae/sentinel_pretrain_group_c_indp_mask_drop0910_96p8_cont/checkpoint-50.pth \
+--dropped_bands 0 9 10 --nb_classes 19 --model_type group_c --output_dir ./bigearthnet_finetune --dist_eval \
+--log_dir ./bigearthnet_finetune --wandb bigearthnet_ms > bigearthnet_finetune.out 2>&1  &

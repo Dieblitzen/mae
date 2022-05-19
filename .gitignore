@@ -1,0 +1,6 @@
+__pycache__/
+*.out
+bigearthnet_finetune/
+test/
+util/__pycache__/
+wandb/

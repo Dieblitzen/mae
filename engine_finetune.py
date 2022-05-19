@@ -14,6 +14,9 @@ import sys
 from typing import Iterable, Optional
 
 import torch
+import torch.nn as nn
+from sklearn.metrics import average_precision_score
+
 
 from timm.data import Mixup
 from timm.utils import accuracy
@@ -51,9 +54,12 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
         if mixup_fn is not None:
             samples, targets = mixup_fn(samples, targets)
+        
+        # print(samples.shape, targets.shape)
 
         with torch.cuda.amp.autocast():
             outputs = model(samples)
+            # print(outputs.shape)
             loss = criterion(outputs, targets)
 
         loss_value = loss.item()
@@ -100,6 +106,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 def evaluate(data_loader, model, device):
     criterion = torch.nn.CrossEntropyLoss()
 
+    criterion = nn.MultiLabelSoftMarginLoss()
+
     metric_logger = misc.MetricLogger(delimiter="  ")
     header = 'Test:'
 
@@ -117,15 +125,19 @@ def evaluate(data_loader, model, device):
             output = model(images)
             loss = criterion(output, target)
 
-        acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        # acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        ap = average_precision_score(target.cpu(), torch.sigmoid(output).detach().cpu(), average='micro') * 100.0
 
         batch_size = images.shape[0]
         metric_logger.update(loss=loss.item())
-        metric_logger.meters['acc1'].update(acc1.item(), n=batch_size)
-        metric_logger.meters['acc5'].update(acc5.item(), n=batch_size)
+        metric_logger.meters['ap'].update(ap.item(), n=batch_size)
+        # metric_logger.meters['acc1'].update(acc1.item(), n=batch_size)
+        # metric_logger.meters['acc5'].update(acc5.item(), n=batch_size)
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
-    print('* Acc@1 {top1.global_avg:.3f} Acc@5 {top5.global_avg:.3f} loss {losses.global_avg:.3f}'
-          .format(top1=metric_logger.acc1, top5=metric_logger.acc5, losses=metric_logger.loss))
+    # print('* Acc@1 {top1.global_avg:.3f} Acc@5 {top5.global_avg:.3f} loss {losses.global_avg:.3f}'
+    #       .format(top1=metric_logger.acc1, top5=metric_logger.acc5, losses=metric_logger.loss))
+    print('* ap {ap.global_avg:.3f} loss {losses.global_avg:.3f}'
+          .format(ap=metric_logger.ap, losses=metric_logger.loss))
 
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}

@@ -9,6 +9,7 @@ from pathlib import Path
 
 
 import torch
+import torch.nn as nn
 import torch.backends.cudnn as cudnn
 from torch.utils.tensorboard import SummaryWriter
 
@@ -185,8 +186,21 @@ def main(args):
 
     cudnn.benchmark = True
 
-    dataset_train = build_fmow_dataset(is_train=True, args=args)
-    dataset_val = build_fmow_dataset(is_train=False, args=args)
+    # dataset_train = build_fmow_dataset(is_train=True, args=args)
+    # dataset_val = build_fmow_dataset(is_train=False, args=args)
+    from util.bigearthnet import Bigearthnet
+    from util.data import random_subset
+    dataset_train = Bigearthnet(
+        root='/home/yzcong',
+        split='train'
+    )   
+    dataset_train = random_subset(dataset_train, 0.1, 42)
+
+    dataset_val = Bigearthnet(
+        root='/home/yzcong',
+        split='val'
+    )
+    # dataset_val = random_subset(dataset_val, 0.1, 42)
 
     if True:  # args.distributed:
         num_tasks = misc.get_world_size()
@@ -340,6 +354,8 @@ def main(args):
     else:
         criterion = torch.nn.CrossEntropyLoss()
 
+    criterion = nn.MultiLabelSoftMarginLoss()
+
     print("criterion = %s" % str(criterion))
 
     misc.load_model(args=args, model_without_ddp=model_without_ddp, optimizer=optimizer, loss_scaler=loss_scaler)
@@ -376,13 +392,18 @@ def main(args):
                 loss_scaler=loss_scaler, epoch=epoch)
 
         test_stats = evaluate(data_loader_val, model, device)
-        print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
-        max_accuracy = max(max_accuracy, test_stats["acc1"])
-        print(f'Max accuracy: {max_accuracy:.2f}%')
+        # print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
+        # max_accuracy = max(max_accuracy, test_stats["acc1"])
+        # print(f'Max accuracy: {max_accuracy:.2f}%')
+
+        print(f"AP of the network on the {len(dataset_val)} test images: {test_stats['ap']:.1f}%")
+        max_accuracy = max(max_accuracy, test_stats["ap"])
+        print(f'Max ap: {max_accuracy:.2f}%')
 
         if log_writer is not None:
-            log_writer.add_scalar('perf/test_acc1', test_stats['acc1'], epoch)
-            log_writer.add_scalar('perf/test_acc5', test_stats['acc5'], epoch)
+            # log_writer.add_scalar('perf/test_acc1', test_stats['acc1'], epoch)
+            # log_writer.add_scalar('perf/test_acc5', test_stats['acc5'], epoch)
+            log_writer.add_scalar('perf/test_ap', test_stats['ap'], epoch)
             log_writer.add_scalar('perf/test_loss', test_stats['loss'], epoch)
 
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
