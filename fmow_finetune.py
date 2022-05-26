@@ -143,6 +143,7 @@ def get_args_parser():
     parser.add_argument('--seed', default=0, type=int)
     parser.add_argument('--resume', default='',
                         help='resume from checkpoint')
+    parser.add_argument('--save_every', type=int, default=2, help='How frequently (in epochs) to save ckpt')
     parser.add_argument('--wandb', type=str, default=None,
                         help="Wandb project name, eg: sentinel_finetune")
 
@@ -266,6 +267,14 @@ def main(args):
         print("Load pre-trained checkpoint from: %s" % args.finetune)
         checkpoint_model = checkpoint['model']
         state_dict = model.state_dict()
+
+        # if 'patch_embed.proj.weight' in checkpoint_model and 'patch_embed.proj.weight' in state_dict:
+        #     ckpt_patch_embed_weight = checkpoint_model['patch_embed.proj.weight']
+        #     model_patch_embed_weight = state_dict['patch_embed.proj.weight']
+        #     if ckpt_patch_embed_weight.shape[1] != model_patch_embed_weight.shape[1]:
+        #         print('Using 3 channels of ckpt patch_embed')
+        #         model.patch_embed.proj.weight.data[:, :3, :, :] = ckpt_patch_embed_weight.data[:, :3, :, :]
+
         # TODO: Do something smarter?
         for k in ['pos_embed', 'patch_embed.proj.weight', 'patch_embed.proj.bias', 'head.weight', 'head.bias']:
             if k in checkpoint_model and checkpoint_model[k].shape != state_dict[k].shape:
@@ -314,7 +323,7 @@ def main(args):
         model_without_ddp = model.module
 
     # build optimizer with layer-wise lr decay (lrd)
-    if args.model_type.startswith('resnet'):
+    if args.model_type is not None and args.model_type.startswith('resnet'):
         param_groups = model_without_ddp.parameters()
     else:
         param_groups = lrd.param_groups_lrd(model_without_ddp, args.weight_decay,
@@ -361,7 +370,7 @@ def main(args):
             log_writer=log_writer,
             args=args
         )
-        if args.output_dir and (epoch % 2 == 0 or epoch + 1 == args.epochs):
+        if args.output_dir and (epoch % args.save_every == 0 or epoch + 1 == args.epochs):
             misc.save_model(
                 args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                 loss_scaler=loss_scaler, epoch=epoch)

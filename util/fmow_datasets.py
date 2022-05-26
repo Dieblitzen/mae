@@ -360,6 +360,51 @@ class SentinelIndividualImageDataset(SatelliteDataset):
         return img_as_tensor, labels
 
 
+class EuroSat(SatelliteDataset):
+    mean = [1370.19151926, 1184.3824625, 1120.77120066, 1136.26026392,
+            1263.73947144, 1645.40315151, 1846.87040806, 1762.59530783,
+            1972.62420416, 582.72633433, 14.77112979, 1732.16362238, 1247.91870117]
+    std = [633.15169573, 650.2842772, 712.12507725, 965.23119807,
+           948.9819932, 1108.06650639, 1258.36394548, 1233.1492281,
+           1364.38688993, 472.37967789, 14.3114637, 1310.36996126, 1087.6020813]
+
+    def __init__(self, file_path, transform, masked_bands=None, dropped_bands=None):
+        super().__init__(13)
+        with open(file_path, 'r') as f:
+            data = f.read().splitlines()
+        self.img_paths = [row.split()[0] for row in data]
+        self.labels = [int(row.split()[1]) for row in data]
+
+        self.transform = transform
+
+        self.masked_bands = masked_bands
+        self.dropped_bands = dropped_bands
+        if self.dropped_bands is not None:
+            self.in_c = self.in_c - len(dropped_bands)
+
+    def __len__(self):
+        return len(self.img_paths)
+
+    def open_image(self, img_path):
+        with rasterio.open(img_path) as data:
+            img = data.read()  # (c, h, w)
+
+        return img.transpose(1, 2, 0).astype(np.float32)  # (h, w, c)
+
+    def __getitem__(self, idx):
+        img_path, label = self.img_paths[idx], self.labels[idx]
+        img = self.open_image(img_path)  # (h, w, c)
+        if self.masked_bands is not None:
+            img[:, :, self.masked_bands] = np.array(self.mean)[self.masked_bands]
+
+        img_as_tensor = self.transform(img)  # (c, h, w)
+        if self.dropped_bands is not None:
+            keep_idxs = [i for i in range(img_as_tensor.shape[0]) if i not in self.dropped_bands]
+            img_as_tensor = img_as_tensor[keep_idxs, :, :]
+
+        return img_as_tensor, label
+
+
 class JointDataset(SatelliteDataset):
     mean = [0.4182007312774658, 0.4214799106121063, 0.3991275727748871,  # RGB
             1370.19151926, 1184.3824625 , 1120.77120066, 1136.26026392,  # Sentinel
@@ -453,6 +498,10 @@ def build_fmow_dataset(is_train, args) -> SatelliteDataset:
         rgb_transform = build_transform(is_train, args.input_size, rgb_mean, rgb_std)
         sent_transform = build_transform(is_train, args.input_size, sent_mean, sent_std)
         dataset = JointDataset(csv_path, sent_transform, rgb_transform, strict_joint=True)
+    elif args.dataset_type == 'euro_sat':
+        mean, std = EuroSat.mean, EuroSat.std
+        transform = build_transform(is_train, args.input_size, mean, std)
+        dataset = EuroSat(csv_path, transform, masked_bands=args.masked_bands, dropped_bands=args.dropped_bands)
     elif args.dataset_type == 'combined':
         raise NotImplementedError("combined not yet implemented")
     else:
