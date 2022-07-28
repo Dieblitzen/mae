@@ -91,7 +91,7 @@ def get_args_parser():
     parser.add_argument('--dropped_bands', type=int, nargs='+', default=None,
                         help="Which bands (0 indexed) to drop from sentinel data.")
     parser.add_argument('--grouped_bands', type=int, nargs='+', action='append',
-                        default=[[0, 1, 2, 6], [3, 4, 5, 7], [8, 9]], help="Bands to group for GroupC mae")
+                        default=[], help="Bands to group for GroupC mae")
 
     parser.add_argument('--output_dir', default='./output_dir',
                         help='path where to save, empty for no saving')
@@ -176,6 +176,9 @@ def main(args):
                                                          spatial_mask=args.spatial_mask,
                                                          norm_pix_loss=args.norm_pix_loss)
     elif args.model_type == 'group_c':
+        # Workaround because action append will add to default list
+        if len(args.grouped_bands) == 0:
+            args.grouped_bands = [[0, 1, 2, 6], [3, 4, 5, 7], [8, 9]]
         print(f"Grouping bands {args.grouped_bands}")
         model = models_mae_group_channels.__dict__[args.model](img_size=args.input_size,
                                                                patch_size=args.patch_size,
