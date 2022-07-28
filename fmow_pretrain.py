@@ -176,6 +176,7 @@ def main(args):
                                                          spatial_mask=args.spatial_mask,
                                                          norm_pix_loss=args.norm_pix_loss)
     elif args.model_type == 'group_c':
+        print(f"Grouping bands {args.grouped_bands}")
         model = models_mae_group_channels.__dict__[args.model](img_size=args.input_size,
                                                                patch_size=args.patch_size,
                                                                in_chans=dataset_train.in_c,
