@@ -473,6 +473,19 @@ class JointDataset(SatelliteDataset):
         return img_as_tensor, labels
 
 
+class SentinelNormalize:
+    def __init__(self, mean, std):
+        self.mean = np.array(mean)
+        self.std = np.array(std)
+
+    def __call__(self, x, *args, **kwargs):
+        min_value = self.mean - 2 * self.std
+        max_value = self.mean + 2 * self.std
+        img = (x - min_value) / (max_value - min_value) * 255.0
+        img = np.clip(img, 0, 255).astype(np.uint8)
+        return img
+
+
 def build_fmow_dataset(is_train, args) -> SatelliteDataset:
     csv_path = os.path.join(args.train_path if is_train else args.test_path)
 
