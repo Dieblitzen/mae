@@ -303,14 +303,14 @@ class MaskedAutoencoderGroupChannelViT(nn.Module):
         """
         target = self.patchify(imgs, self.patch_embed[0].patch_size[0], self.in_c)  # (N, L, C*P*P)
 
-        N, L, _ = target.shape
-        target = target.view(N, L, self.in_c, -1)  # (N, L, C, p^2)
-        target = torch.einsum('nlcp->nclp', target)  # (N, C, L, p^2)
-
         if self.norm_pix_loss:
             mean = target.mean(dim=-1, keepdim=True)
             var = target.var(dim=-1, keepdim=True)
             target = (target - mean) / (var + 1.e-6) ** .5
+
+        N, L, _ = target.shape
+        target = target.view(N, L, self.in_c, -1)  # (N, L, C, p^2)
+        target = torch.einsum('nlcp->nclp', target)  # (N, C, L, p^2)
 
         loss = (pred - target) ** 2
         loss = loss.mean(dim=-1)  # [N, C, L], mean loss per patch
