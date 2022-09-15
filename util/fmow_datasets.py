@@ -43,6 +43,41 @@ class SatelliteDataset(Dataset):
     def __init__(self, in_c):
         self.in_c = in_c
 
+    @staticmethod
+    def build_transform(is_train, input_size, mean, std):
+        # mean = IMAGENET_DEFAULT_MEAN
+        # std = IMAGENET_DEFAULT_STD
+
+        # train transform
+        interpol_mode = transforms.InterpolationMode.BICUBIC
+
+        t = []
+        if is_train:
+            t.append(transforms.ToTensor())
+            t.append(transforms.Normalize(mean, std))
+            t.append(
+                transforms.RandomResizedCrop(input_size, scale=(0.2, 1.0), interpolation=interpol_mode),  # 3 is bicubic
+            )
+            t.append(transforms.RandomHorizontalFlip())
+            return transforms.Compose(t)
+
+        # eval transform
+        if input_size <= 224:
+            crop_pct = 224 / 256
+        else:
+            crop_pct = 1.0
+        size = int(input_size / crop_pct)
+
+        t.append(transforms.ToTensor())
+        t.append(transforms.Normalize(mean, std))
+        t.append(
+            transforms.Resize(size, interpolation=interpol_mode),  # to maintain same ratio w.r.t. 224 images
+        )
+        t.append(transforms.CenterCrop(input_size))
+
+        # t.append(transforms.Normalize(mean, std))
+        return transforms.Compose(t)
+
 
 class CustomDatasetFromImages(SatelliteDataset):
     mean = [0.4182007312774658, 0.4214799106121063, 0.3991275727748871]
@@ -238,6 +273,24 @@ class FMoWTemporalStacked(SatelliteDataset):
         return self.data_len
 
 
+#########################################################
+# SENTINEL DEFINITIONS
+#########################################################
+
+
+class SentinelNormalize:
+    def __init__(self, mean, std):
+        self.mean = np.array(mean)
+        self.std = np.array(std)
+
+    def __call__(self, x, *args, **kwargs):
+        min_value = self.mean - 2 * self.std
+        max_value = self.mean + 2 * self.std
+        img = (x - min_value) / (max_value - min_value) * 255.0
+        img = np.clip(img, 0, 255).astype(np.uint8)
+        return img
+
+
 class SentinelIndividualImageDataset(SatelliteDataset):
     '''fMoW Dataset'''
     label_types = ['value', 'one-hot']
@@ -359,6 +412,37 @@ class SentinelIndividualImageDataset(SatelliteDataset):
         }
         return img_as_tensor, labels
 
+    @staticmethod
+    def build_transform(is_train, input_size, mean, std):
+        # train transform
+        interpol_mode = transforms.InterpolationMode.BICUBIC
+
+        t = []
+        if is_train:
+            t.append(SentinelNormalize(mean, std))
+            t.append(transforms.ToTensor())
+            t.append(
+                transforms.RandomResizedCrop(input_size, scale=(0.2, 1.0), interpolation=interpol_mode),  # 3 is bicubic
+            )
+            t.append(transforms.RandomHorizontalFlip())
+            return transforms.Compose(t)
+
+        # eval transform
+        if input_size <= 224:
+            crop_pct = 224 / 256
+        else:
+            crop_pct = 1.0
+        size = int(input_size / crop_pct)
+
+        t.append(SentinelNormalize(mean, std))
+        t.append(transforms.ToTensor())
+        t.append(
+            transforms.Resize(size, interpolation=interpol_mode),  # to maintain same ratio w.r.t. 224 images
+        )
+        t.append(transforms.CenterCrop(input_size))
+
+        return transforms.Compose(t)
+
 
 class EuroSat(SatelliteDataset):
     mean = [1370.19151926, 1184.3824625, 1120.77120066, 1136.26026392,
@@ -473,47 +557,35 @@ class JointDataset(SatelliteDataset):
         return img_as_tensor, labels
 
 
-class SentinelNormalize:
-    def __init__(self, mean, std):
-        self.mean = np.array(mean)
-        self.std = np.array(std)
-
-    def __call__(self, x, *args, **kwargs):
-        min_value = self.mean - 2 * self.std
-        max_value = self.mean + 2 * self.std
-        img = (x - min_value) / (max_value - min_value) * 255.0
-        img = np.clip(img, 0, 255).astype(np.uint8)
-        return img
-
-
 def build_fmow_dataset(is_train, args) -> SatelliteDataset:
     csv_path = os.path.join(args.train_path if is_train else args.test_path)
 
     if args.dataset_type == 'rgb':
         mean = CustomDatasetFromImages.mean
         std = CustomDatasetFromImages.std
-        transform = build_transform(is_train, args.input_size, mean, std)
+        transform = CustomDatasetFromImages.build_transform(is_train, args.input_size, mean, std)
         dataset = CustomDatasetFromImages(csv_path, transform)
     elif args.dataset_type == 'sentinel':
         mean = SentinelIndividualImageDataset.mean
         std = SentinelIndividualImageDataset.std
-        transform = build_transform(is_train, args.input_size, mean, std)
+        transform = SentinelIndividualImageDataset.build_transform(is_train, args.input_size, mean, std)
         dataset = SentinelIndividualImageDataset(csv_path, transform, masked_bands=args.masked_bands,
                                                  dropped_bands=args.dropped_bands)
     elif args.dataset_type == 'rgb_temporal_stacked':
         mean = FMoWTemporalStacked.mean
         std = FMoWTemporalStacked.std
-        transform = build_transform(is_train, args.input_size, mean, std)
+        transform = CustomDatasetFromImagesTemporal.build_transform(is_train, args.input_size, mean, std)
         dataset = FMoWTemporalStacked(csv_path, transform)
     elif args.dataset_type == 'strict_joint':
-        rgb_mean, rgb_std = CustomDatasetFromImages.mean, CustomDatasetFromImages.std
-        sent_mean, sent_std = SentinelIndividualImageDataset.mean, SentinelIndividualImageDataset.std
-        rgb_transform = build_transform(is_train, args.input_size, rgb_mean, rgb_std)
-        sent_transform = build_transform(is_train, args.input_size, sent_mean, sent_std)
-        dataset = JointDataset(csv_path, sent_transform, rgb_transform, strict_joint=True)
+        # rgb_mean, rgb_std = CustomDatasetFromImages.mean, CustomDatasetFromImages.std
+        # sent_mean, sent_std = SentinelIndividualImageDataset.mean, SentinelIndividualImageDataset.std
+        # rgb_transform = build_transform(is_train, args.input_size, rgb_mean, rgb_std)
+        # sent_transform = build_transform(is_train, args.input_size, sent_mean, sent_std)
+        # dataset = JointDataset(csv_path, sent_transform, rgb_transform, strict_joint=True)
+        raise NotImplementedError()
     elif args.dataset_type == 'euro_sat':
         mean, std = EuroSat.mean, EuroSat.std
-        transform = build_transform(is_train, args.input_size, mean, std)
+        transform = EuroSat.build_transform(is_train, args.input_size, mean, std)
         dataset = EuroSat(csv_path, transform, masked_bands=args.masked_bands, dropped_bands=args.dropped_bands)
     elif args.dataset_type == 'combined':
         raise NotImplementedError("combined not yet implemented")
@@ -522,37 +594,3 @@ def build_fmow_dataset(is_train, args) -> SatelliteDataset:
     print(dataset)
 
     return dataset
-
-
-def build_transform(is_train, input_size, mean, std):
-    # mean = IMAGENET_DEFAULT_MEAN
-    # std = IMAGENET_DEFAULT_STD
-    # train transform
-    interpol_mode = transforms.InterpolationMode.BICUBIC
-
-    t = []
-    if is_train:
-        t.append(transforms.ToTensor())
-        t.append(transforms.Normalize(mean, std))
-        t.append(
-            transforms.RandomResizedCrop(input_size, scale=(0.2, 1.0), interpolation=interpol_mode),  # 3 is bicubic
-        )
-        t.append(transforms.RandomHorizontalFlip())
-        return transforms.Compose(t)
-
-    # eval transform
-    if input_size <= 224:
-        crop_pct = 224 / 256
-    else:
-        crop_pct = 1.0
-    size = int(input_size / crop_pct)
-
-    t.append(transforms.ToTensor())
-    t.append(transforms.Normalize(mean, std))
-    t.append(
-        transforms.Resize(size, interpolation=interpol_mode),  # to maintain same ratio w.r.t. 224 images
-    )
-    t.append(transforms.CenterCrop(input_size))
-
-    # t.append(transforms.Normalize(mean, std))
-    return transforms.Compose(t)
